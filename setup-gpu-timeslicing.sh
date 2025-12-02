@@ -66,6 +66,8 @@ fi
 echo "📦 Step 1: Creating time-slicing ConfigMap..."
 
 # Create ConfigMap for time-slicing
+# Format follows NVIDIA GPU Operator documentation:
+# https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-sharing.html
 kubectl apply -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -75,9 +77,13 @@ metadata:
 data:
   any: |-
     version: v1
+    flags:
+      migStrategy: none
     sharing:
       timeSlicing:
-        replicas: ${REPLICAS}
+        resources:
+        - name: nvidia.com/gpu
+          replicas: ${REPLICAS}
 EOF
 
 echo "✅ ConfigMap created/updated"
