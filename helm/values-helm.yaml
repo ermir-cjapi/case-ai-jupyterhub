@@ -20,44 +20,49 @@ hub:
   
   extraConfig:
     # ============================================
-    # AZURE AD / ENTRA ID AUTHENTICATION
+    # GITHUB OAUTH AUTHENTICATION
     # ============================================
-    # Setup: See local-testing/ENTRA-ID-SETUP.md for Azure Portal configuration
-    # You need: Tenant ID, Client ID, Client Secret from Azure Portal
-    00-azure-ad-auth: |
-      from oauthenticator.azuread import AzureAdOAuthenticator
-      c.JupyterHub.authenticator_class = AzureAdOAuthenticator
+    # Setup: Create OAuth App at https://github.com/settings/developers
+    # 1. Application name: JupyterHub CCRO Labs
+    # 2. Homepage URL: https://jupyterhub.ccrolabs.com
+    # 3. Authorization callback URL: https://jupyterhub.ccrolabs.com/hub/oauth_callback
+    # 4. Copy Client ID and generate Client Secret
+    # 5. Update values below
+    00-github-auth: |
+      from oauthenticator.github import GitHubOAuthenticator
+      c.JupyterHub.authenticator_class = GitHubOAuthenticator
       
-      # REPLACE WITH YOUR AZURE AD CREDENTIALS:
-      c.AzureAdOAuthenticator.tenant_id = "YOUR_TENANT_ID"
-      c.AzureAdOAuthenticator.client_id = "YOUR_CLIENT_ID"
-      c.AzureAdOAuthenticator.client_secret = "YOUR_CLIENT_SECRET"
-      c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
+      # REPLACE WITH YOUR GITHUB OAUTH APP CREDENTIALS:
+      c.GitHubOAuthenticator.client_id = "Ov23lidtVx7ofQPm6Qvz"
+      c.GitHubOAuthenticator.client_secret = "ef282ca998be6a552b00f3ccfe62f18f195a9eae"
+      c.GitHubOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
       
-      # Access control - choose one:
-      # Option 1: Allow all users from your Azure AD tenant
+      # Access control:
+      # Option 1: Allow specific GitHub users
+      # c.GitHubOAuthenticator.allowed_users = {"username1", "username2"}
+      
+      # Option 2: Allow all users who can authenticate (any GitHub user)
       c.Authenticator.allow_all = True
       
-      # Option 2: Allow specific Azure AD groups (requires GroupMember.Read.All permission)
-      # c.AzureAdOAuthenticator.allowed_groups = {"JupyterHub-Users", "Data-Scientists"}
-      
-      # Admin users - choose one:
-      # Option 1: By email
-      c.Authenticator.admin_users = {"your-email@yourcompany.com"}
-      
-      # Option 2: By Azure AD group
-      # c.AzureAdOAuthenticator.admin_groups = {"JupyterHub-Admins"}
+      # Admin users (by GitHub username)
+      c.Authenticator.admin_users = {"your-github-username"}
 
     # ============================================
-    # ALTERNATIVE: GitHub OAuth (Commented out)
+    # ALTERNATIVE: Azure AD / Entra ID (Commented out)
     # ============================================
-    # 00-github-auth: |
-    #   from oauthenticator.github import GitHubOAuthenticator
-    #   c.JupyterHub.authenticator_class = GitHubOAuthenticator
-    #   c.GitHubOAuthenticator.client_id = "YOUR_CLIENT_ID"
-    #   c.GitHubOAuthenticator.client_secret = "YOUR_CLIENT_SECRET"
-    #   c.GitHubOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
-    #   c.Authenticator.admin_users = {"your-github-username"}
+    # 00-azure-ad-auth: |
+    #   from oauthenticator.azuread import AzureAdOAuthenticator
+    #   c.JupyterHub.authenticator_class = AzureAdOAuthenticator
+    #   
+    #   # REPLACE WITH YOUR AZURE AD CREDENTIALS:
+    #   c.AzureAdOAuthenticator.tenant_id = "YOUR_TENANT_ID"
+    #   c.AzureAdOAuthenticator.client_id = "YOUR_CLIENT_ID"
+    #   c.AzureAdOAuthenticator.client_secret = "YOUR_CLIENT_SECRET"
+    #   c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
+    #   
+    #   # Access control
+    #   c.Authenticator.allow_all = True
+    #   c.Authenticator.admin_users = {"your-email@yourcompany.com"}
     
     # ============================================
     # ALTERNATIVE: No Authentication (Testing only)
