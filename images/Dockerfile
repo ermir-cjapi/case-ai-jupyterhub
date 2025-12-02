@@ -6,13 +6,7 @@ USER root
 # System dependencies for additional packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
-    build-essential \
-    curl \
-    wget \
     vim \
-    ncurses-base \
-    libncurses6 \
-    libtinfo6 \
     && rm -rf /var/lib/apt/lists/*
 
 USER ${NB_UID}
