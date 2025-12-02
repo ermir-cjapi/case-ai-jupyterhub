@@ -23,7 +23,25 @@ data:
     c.KubeSpawner.mem_limit = '4G'
     c.KubeSpawner.mem_guarantee = '1G'
     
-    # GPU support - Each user gets 1 GPU
+    # ============================================
+    # GPU CONFIGURATION
+    # ============================================
+    # IMPORTANT: GPU Time-Slicing must be configured first!
+    # See: k8s-manifests/setup-gpu-timeslicing.sh
+    # 
+    # With time-slicing enabled (replicas=4):
+    # - 1 physical GPU becomes 4 virtual GPUs
+    # - 4 users can work simultaneously
+    # - Each gets ~25% when all active, 100% when alone
+    #
+    # Without time-slicing (default):
+    # - Only 1 user at a time per physical GPU
+    # - Other users wait in queue (Pending pods)
+    #
+    # To enable time-slicing on your cluster:
+    #   cd k8s-manifests
+    #   ./setup-gpu-timeslicing.sh
+    # ============================================
     c.KubeSpawner.extra_resource_limits = {"nvidia.com/gpu": "1"}
     c.KubeSpawner.extra_resource_guarantees = {"nvidia.com/gpu": "1"}
     

@@ -1,0 +1,34 @@
+GPU Time-Slicing ConfigMap has been created!
+
+Configuration:
+  Replicas: {{ .Values.replicas }}
+  GPU Operator Namespace: {{ .Values.gpuOperatorNamespace }}
+
+Next steps:
+
+1. Patch the ClusterPolicy to use this config:
+
+   kubectl patch clusterpolicy/cluster-policy \
+     -n {{ .Values.gpuOperatorNamespace }} --type merge \
+     -p '{"spec": {"devicePlugin": {"config": {"name": "time-slicing-config", "default": "any"}}}}'
+
+2. Wait for device plugin to restart (30-60 seconds):
+
+   kubectl rollout status daemonset/nvidia-device-plugin-daemonset -n {{ .Values.gpuOperatorNamespace }}
+
+3. Verify time-slicing is active:
+
+   kubectl get nodes -o json | jq '.items[].status.capacity."nvidia.com/gpu"'
+   
+   Should show: "{{ .Values.replicas }}" (not "1")
+
+4. Deploy JupyterHub:
+
+   cd ../..
+   helm upgrade --install jhub-v1 jupyterhub/jupyterhub \
+     --namespace jupyterhub-test \
+     --create-namespace \
+     --values values-helm.yaml
+
+Your GPU time-slicing is ready! 🚀
+

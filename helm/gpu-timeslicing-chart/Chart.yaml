@@ -1,0 +1,7 @@
+apiVersion: v2
+name: gpu-timeslicing
+description: Configure NVIDIA GPU time-slicing for multi-user GPU sharing
+type: application
+version: 1.0.0
+appVersion: "1.0"
+

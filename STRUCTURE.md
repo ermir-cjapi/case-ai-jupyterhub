@@ -9,7 +9,9 @@ case-ai-jupyterhub/
 │   ├── values-helm.yaml              # All configuration in one file
 │   ├── deploy_jhub_helm.sh           # Deploy with Helm
 │   ├── delete_jhub_helm.sh           # Delete Helm deployment
-│   └── smoke_test_helm.sh            # Test deployment
+│   ├── smoke_test_helm.sh            # Test deployment
+│   ├── setup-gpu-timeslicing.sh      # Enable multi-user GPU (4 users per GPU)
+│   └── GPU-SHARING.md                # GPU sharing guide
 │
 ├── ⚙️  k8s-manifests/                # Plain K8s YAML files (learn step-by-step)
 │   ├── 00-namespace.yaml             # Namespace
@@ -23,6 +25,8 @@ case-ai-jupyterhub/
 │   ├── 08-proxy-service.yaml         # Proxy service
 │   ├── deploy_k8s_manifests.sh       # Deploy all manifests
 │   ├── delete_k8s_manifests.sh       # Delete all resources
+│   ├── setup-gpu-timeslicing.sh      # Enable multi-user GPU (4 users per GPU)
+│   ├── GPU-SHARING.md                # GPU sharing guide
 │   └── README.md                     # Detailed explanation
 │
 ├── 🖼️  images/                       # Docker images
@@ -124,7 +128,13 @@ Template for `lab-config.env` - copy and customize.
 cp lab-config.env.template lab-config.env
 # Edit lab-config.env with your values
 
-# 2. Build and push notebook image
+# 2. Enable GPU sharing (IMPORTANT!)
+# Choose helm/ or k8s-manifests/ based on your deployment method
+cd helm  # or cd k8s-manifests
+./setup-gpu-timeslicing.sh  # Converts 1 GPU → 4 users
+cd ..
+
+# 3. Build and push notebook image
 source lab-config.env
 docker login
 ./images/build_base_image.sh

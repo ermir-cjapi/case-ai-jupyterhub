@@ -1,0 +1,8 @@
+# GPU Time-Slicing Configuration
+# How many users can share each GPU
+
+replicas: 4  # Options: 2, 4, 8, 10
+
+# Namespace where GPU Operator is installed
+gpuOperatorNamespace: gpu-operator
+

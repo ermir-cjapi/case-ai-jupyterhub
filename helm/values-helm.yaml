@@ -92,10 +92,29 @@ singleuser:
   # Start in JupyterLab
   defaultUrl: /lab
   
-  # GPU support - ENABLED
+  # ============================================
+  # GPU CONFIGURATION
+  # ============================================
+  # IMPORTANT: GPU Time-Slicing must be configured first!
+  # See: helm/setup-gpu-timeslicing.sh
+  # 
+  # With time-slicing enabled (replicas=4):
+  # - 1 physical GPU becomes 4 virtual GPUs
+  # - 4 users can work simultaneously
+  # - Each gets ~25% when all active, 100% when alone
+  #
+  # Without time-slicing (default):
+  # - Only 1 user at a time per physical GPU
+  # - Other users wait in queue (Pending pods)
+  #
+  # To enable time-slicing on your cluster:
+  #   cd helm
+  #   ./setup-gpu-timeslicing.sh
+  # ============================================
+  
   extraResource:
     limits:
-      nvidia.com/gpu: "1"
+      nvidia.com/gpu: "1"  # Each user gets 1 GPU slice (1/4 of RTX 5090 if time-slicing enabled)
     guarantees:
       nvidia.com/gpu: "1"
 

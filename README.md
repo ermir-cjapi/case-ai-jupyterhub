@@ -18,19 +18,24 @@ GPU-enabled JupyterHub for your NVIDIA server.
 See every resource clearly, understand each component.
 
 ```bash
-# 1. Build image
+# 1. Enable GPU sharing (IMPORTANT for multi-user!)
+cd k8s-manifests
+./setup-gpu-timeslicing.sh  # Converts 1 GPU → 4 users
+cd ..
+
+# 2. Build image
 source lab-config.env
 docker login
 ./images/build_base_image.sh
 
-# 2. Generate secret
+# 3. Generate secret
 openssl rand -hex 32
 # Update k8s-manifests/02-secrets.yaml line 11
 
-# 3. Configure Azure AD
+# 4. Configure Azure AD
 # Edit k8s-manifests/01-configmap.yaml lines 44-47
 
-# 4. Deploy
+# 5. Deploy
 cd k8s-manifests
 ./deploy_k8s_manifests.sh
 
@@ -43,19 +48,24 @@ cd k8s-manifests
 One command, Helm manages everything.
 
 ```bash
-# 1. Build image
+# 1. Enable GPU sharing (IMPORTANT for multi-user!)
+cd helm
+./setup-gpu-timeslicing.sh  # Converts 1 GPU → 4 users
+cd ..
+
+# 2. Build image
 source lab-config.env
 docker login
 ./images/build_base_image.sh
 
-# 2. Generate secret
+# 3. Generate secret
 openssl rand -hex 32
 # Update helm/values-helm.yaml line 6
 
-# 3. Configure Azure AD
+# 4. Configure Azure AD
 # Edit helm/values-helm.yaml lines 32-46
 
-# 4. Deploy
+# 5. Deploy
 cd helm
 ./deploy_jhub_helm.sh
 
@@ -104,16 +114,33 @@ cd k8s-manifests && ./delete_k8s_manifests.sh
 cd helm && ./delete_jhub_helm.sh
 ```
 
-## GPU Support
+## 🎮 GPU Support & Multi-User Sharing
 
-**K8s Manifests:** GPU is already enabled in `k8s-manifests/01-configmap.yaml` lines 24-25
+### GPU is Enabled by Default
+**K8s Manifests:** `k8s-manifests/01-configmap.yaml` lines 36-37  
+**Helm:** `helm/values-helm.yaml` lines 114-117
 
-**Helm:** Edit `helm/values-helm.yaml`, uncomment:
-```yaml
-extraResource:
-  limits:
-    nvidia.com/gpu: "1"
+### ⚠️ Important: Enable GPU Sharing First!
+
+**Without GPU sharing:**
+- 1 RTX 5090 → Only 1 user at a time
+- Other users wait indefinitely (Pending pods)
+
+**With GPU sharing (time-slicing):**
+- 1 RTX 5090 → 4 users simultaneously
+- Each gets ~25% when all active, 100% when alone
+
+### Enable GPU Sharing
+
+```bash
+# For Helm deployment
+cd helm && ./setup-gpu-timeslicing.sh
+
+# For K8s manifests deployment
+cd k8s-manifests && ./setup-gpu-timeslicing.sh
 ```
+
+**See:** `helm/GPU-SHARING.md` or `k8s-manifests/GPU-SHARING.md` for details
 
 ---
 
