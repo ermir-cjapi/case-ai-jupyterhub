@@ -11,7 +11,7 @@ FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
 
 echo "Building image ${FULL_IMAGE} ..."
 
-cd "${ROOT_DIR}/images/base-notebook"
+cd "${ROOT_DIR}/images"
 docker build -t "${FULL_IMAGE}" .
 
 echo "Pushing image ${FULL_IMAGE} ..."
