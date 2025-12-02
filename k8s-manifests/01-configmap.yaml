@@ -27,7 +27,7 @@ data:
     # GPU CONFIGURATION
     # ============================================
     # IMPORTANT: GPU Time-Slicing must be configured first!
-    # See: k8s-manifests/setup-gpu-timeslicing.sh
+    # See: GPU-SHARING.md for details
     # 
     # With time-slicing enabled (replicas=4):
     # - 1 physical GPU becomes 4 virtual GPUs
@@ -38,8 +38,7 @@ data:
     # - Only 1 user at a time per physical GPU
     # - Other users wait in queue (Pending pods)
     #
-    # To enable time-slicing on your cluster:
-    #   cd k8s-manifests
+    # To enable time-slicing on your cluster (RUN ONCE):
     #   ./setup-gpu-timeslicing.sh
     # ============================================
     c.KubeSpawner.extra_resource_limits = {"nvidia.com/gpu": "1"}

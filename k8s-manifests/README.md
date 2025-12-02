@@ -15,8 +15,6 @@ Plain Kubernetes YAML files - understand each resource step by step.
 | `06-hub-service.yaml` | Hub network service | Internal communication |
 | `07-proxy-deployment.yaml` | Proxy pod (router) | Routes traffic to notebooks |
 | `08-proxy-service.yaml` | Proxy network service | **Cloudflare connects here** |
-| `setup-gpu-timeslicing.sh` | Enable GPU sharing | **Run first for multi-user GPU!** |
-| `GPU-SHARING.md` | GPU sharing guide | Multi-user configuration |
 
 ## 🎮 GPU Sharing (IMPORTANT!)
 
@@ -26,14 +24,15 @@ Plain Kubernetes YAML files - understand each resource step by step.
 ### Enable Multi-User GPU Access
 
 ```bash
-# Run BEFORE deploying JupyterHub
-cd k8s-manifests
+# Run BEFORE deploying JupyterHub (from project root)
 ./setup-gpu-timeslicing.sh
 ```
 
 This converts your 1 RTX 5090 → 4 virtual GPUs (4 concurrent users).
 
-**See:** `GPU-SHARING.md` for details.
+**Note:** GPU time-slicing is cluster-wide, run once regardless of deployment method.
+
+**See:** `GPU-SHARING.md` (in root directory) for details.
 
 ## 🚀 Deploy (Manual - One by One)
 

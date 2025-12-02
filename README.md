@@ -18,10 +18,8 @@ GPU-enabled JupyterHub for your NVIDIA server.
 See every resource clearly, understand each component.
 
 ```bash
-# 1. Enable GPU sharing (IMPORTANT for multi-user!)
-cd k8s-manifests
+# 1. Enable GPU sharing (IMPORTANT for multi-user! Run once)
 ./setup-gpu-timeslicing.sh  # Converts 1 GPU → 4 users
-cd ..
 
 # 2. Build image
 source lab-config.env
@@ -48,10 +46,8 @@ cd k8s-manifests
 One command, Helm manages everything.
 
 ```bash
-# 1. Enable GPU sharing (IMPORTANT for multi-user!)
-cd helm
+# 1. Enable GPU sharing (IMPORTANT for multi-user! Run once)
 ./setup-gpu-timeslicing.sh  # Converts 1 GPU → 4 users
-cd ..
 
 # 2. Build image
 source lab-config.env
@@ -130,17 +126,15 @@ cd helm && ./delete_jhub_helm.sh
 - 1 RTX 5090 → 4 users simultaneously
 - Each gets ~25% when all active, 100% when alone
 
-### Enable GPU Sharing
+### Enable GPU Sharing (Run Once - Cluster-Wide)
 
 ```bash
-# For Helm deployment
-cd helm && ./setup-gpu-timeslicing.sh
-
-# For K8s manifests deployment
-cd k8s-manifests && ./setup-gpu-timeslicing.sh
+# This applies to your entire k8s cluster
+# Only needs to be run once regardless of deployment method
+./setup-gpu-timeslicing.sh
 ```
 
-**See:** `helm/GPU-SHARING.md` or `k8s-manifests/GPU-SHARING.md` for details
+**See:** `GPU-SHARING.md` for details
 
 ---
 
