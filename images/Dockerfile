@@ -1,4 +1,4 @@
-FROM jupyter/minimal-notebook:python-3.11
+FROM jupyter/minimal-notebook:latest
 
 USER root
 
@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     vim \
+    libtinfo6 \
   && rm -rf /var/lib/apt/lists/*
 
 USER ${NB_UID}
