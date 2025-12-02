@@ -1,0 +1,53 @@
+# JupyterHub Proxy - Routes traffic to hub and user notebooks
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy
+  namespace: jupyterhub-test
+  labels:
+    app: jupyterhub
+    component: proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jupyterhub
+      component: proxy
+  template:
+    metadata:
+      labels:
+        app: jupyterhub
+        component: proxy
+    spec:
+      containers:
+      - name: proxy
+        image: jupyterhub/configurable-http-proxy:4.6.1
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 8001
+          name: api
+        env:
+        # Proxy secret token (same as hub)
+        - name: CONFIGPROXY_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: jupyterhub-secrets
+              key: proxy-token
+        
+        command:
+        - configurable-http-proxy
+        - --ip=0.0.0.0
+        - --port=8000
+        - --api-ip=0.0.0.0
+        - --api-port=8001
+        - --default-target=http://hub:8081
+        
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 1Gi
+

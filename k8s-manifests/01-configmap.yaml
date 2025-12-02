@@ -1,0 +1,73 @@
+# JupyterHub Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jupyterhub-config
+  namespace: jupyterhub-test
+data:
+  jupyterhub_config.py: |
+    # JupyterHub Configuration for Kubernetes
+    import os
+    
+    # Use KubeSpawner to create pods for each user
+    c.JupyterHub.spawner_class = 'kubespawner.KubeSpawner'
+    
+    # Spawner configuration
+    c.KubeSpawner.namespace = 'jupyterhub-test'
+    c.KubeSpawner.image = 'docker.io/ermircjapi/jupyterhub-notebook:latest'
+    c.KubeSpawner.image_pull_policy = 'Always'
+    
+    # Resource limits per user
+    c.KubeSpawner.cpu_limit = 2
+    c.KubeSpawner.cpu_guarantee = 0.5
+    c.KubeSpawner.mem_limit = '4G'
+    c.KubeSpawner.mem_guarantee = '1G'
+    
+    # GPU support - Each user gets 1 GPU
+    c.KubeSpawner.extra_resource_limits = {"nvidia.com/gpu": "1"}
+    c.KubeSpawner.extra_resource_guarantees = {"nvidia.com/gpu": "1"}
+    
+    # Storage for each user (PVC created automatically)
+    c.KubeSpawner.storage_class = 'local-path'
+    c.KubeSpawner.storage_capacity = '10Gi'
+    c.KubeSpawner.storage_pvc_ensure = True
+    
+    # User notebook starts in JupyterLab
+    c.Spawner.default_url = '/lab'
+    
+    # Timeouts
+    c.Spawner.start_timeout = 300
+    c.Spawner.http_timeout = 120
+    
+    # ============================================
+    # AZURE AD / ENTRA ID AUTHENTICATION
+    # ============================================
+    from oauthenticator.azuread import AzureAdOAuthenticator
+    c.JupyterHub.authenticator_class = AzureAdOAuthenticator
+    
+    # REPLACE WITH YOUR AZURE AD CREDENTIALS:
+    c.AzureAdOAuthenticator.tenant_id = os.getenv('AZURE_TENANT_ID', 'YOUR_TENANT_ID')
+    c.AzureAdOAuthenticator.client_id = os.getenv('AZURE_CLIENT_ID', 'YOUR_CLIENT_ID')
+    c.AzureAdOAuthenticator.client_secret = os.getenv('AZURE_CLIENT_SECRET', 'YOUR_CLIENT_SECRET')
+    c.AzureAdOAuthenticator.oauth_callback_url = 'https://jupyterhub.ccrolabs.com/hub/oauth_callback'
+    
+    # Access control
+    c.Authenticator.allow_all = True
+    c.Authenticator.admin_users = {'your-email@yourcompany.com'}
+    
+    # Hub configuration
+    c.JupyterHub.hub_connect_ip = 'hub'
+    c.JupyterHub.hub_ip = '0.0.0.0'
+    
+    # Auto-shutdown idle notebooks after 1 hour
+    c.JupyterHub.services = [
+        {
+            'name': 'idle-culler',
+            'admin': True,
+            'command': [
+                'python3', '-m', 'jupyterhub_idle_culler',
+                '--timeout=3600'
+            ],
+        }
+    ]
+

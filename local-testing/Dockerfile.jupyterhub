@@ -1,0 +1,16 @@
+# Custom JupyterHub image with DockerSpawner
+# Needed for Docker Compose setup
+
+FROM jupyterhub/jupyterhub:4.0
+
+# Install DockerSpawner
+RUN pip install --no-cache-dir \
+    dockerspawner \
+    jupyterhub-idle-culler
+
+# Install additional packages
+RUN pip install --no-cache-dir \
+    oauthenticator
+
+USER ${NB_USER}
+

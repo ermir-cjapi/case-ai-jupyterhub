@@ -1,0 +1,31 @@
+# Docker Compose - Local JupyterHub Testing (CPU-only)
+# This runs JupyterHub locally without Kubernetes for quick testing
+
+version: '3.8'
+
+services:
+  jupyterhub:
+    build:
+      context: .
+      dockerfile: Dockerfile.jupyterhub
+    container_name: jupyterhub-test
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./jupyterhub_config.py:/srv/jupyterhub/jupyterhub_config.py
+      - jupyterhub-data:/srv/jupyterhub
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    environment:
+      - DOCKER_NETWORK_NAME=jupyterhub-network
+    command: jupyterhub -f /srv/jupyterhub/jupyterhub_config.py
+    networks:
+      - jupyterhub-network
+    restart: unless-stopped
+
+volumes:
+  jupyterhub-data:
+
+networks:
+  jupyterhub-network:
+    name: jupyterhub-network
+

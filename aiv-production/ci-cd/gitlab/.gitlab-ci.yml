@@ -1,0 +1,35 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  REGISTRY: "registry.example.com"
+  IMAGE_NAME: "${REGISTRY}/iav/base-notebook"
+  IMAGE_TAG: "v1"
+
+build-image:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - cd images/base-notebook
+    - docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" .
+    - docker push "${IMAGE_NAME}:${IMAGE_TAG}"
+  only:
+    - main
+
+deploy-jhub-v1:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  script:
+    - kubectl config use-context "$KUBE_CONTEXT"
+    - bash scripts/deploy_jhub_v1.sh
+  when: manual
+  only:
+    - main
+
+

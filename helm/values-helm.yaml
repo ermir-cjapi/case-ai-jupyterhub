@@ -1,0 +1,111 @@
+# JupyterHub Helm Values - Kubernetes Deployment
+# This is the same as jupyterhub_config.py but in YAML format for Kubernetes
+
+proxy:
+  # Generate with: openssl rand -hex 32
+  secretToken: "a7c63b7d74e9628282eca95874fa7a9f69797f027512bb6d9f0636bb9689307e"
+  service:
+    type: ClusterIP  # Cloudflare connects to ClusterIP, not LoadBalancer
+  https:
+    enabled: false  # Cloudflare handles TLS
+
+hub:
+  service:
+    type: ClusterIP
+  db:
+    type: sqlite-pvc  # Simple SQLite database
+  config:
+    JupyterHub:
+      admin_access: true
+  
+  extraConfig:
+    # ============================================
+    # AZURE AD / ENTRA ID AUTHENTICATION
+    # ============================================
+    # Setup: See local-testing/ENTRA-ID-SETUP.md for Azure Portal configuration
+    # You need: Tenant ID, Client ID, Client Secret from Azure Portal
+    00-azure-ad-auth: |
+      from oauthenticator.azuread import AzureAdOAuthenticator
+      c.JupyterHub.authenticator_class = AzureAdOAuthenticator
+      
+      # REPLACE WITH YOUR AZURE AD CREDENTIALS:
+      c.AzureAdOAuthenticator.tenant_id = "YOUR_TENANT_ID"
+      c.AzureAdOAuthenticator.client_id = "YOUR_CLIENT_ID"
+      c.AzureAdOAuthenticator.client_secret = "YOUR_CLIENT_SECRET"
+      c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
+      
+      # Access control - choose one:
+      # Option 1: Allow all users from your Azure AD tenant
+      c.Authenticator.allow_all = True
+      
+      # Option 2: Allow specific Azure AD groups (requires GroupMember.Read.All permission)
+      # c.AzureAdOAuthenticator.allowed_groups = {"JupyterHub-Users", "Data-Scientists"}
+      
+      # Admin users - choose one:
+      # Option 1: By email
+      c.Authenticator.admin_users = {"your-email@yourcompany.com"}
+      
+      # Option 2: By Azure AD group
+      # c.AzureAdOAuthenticator.admin_groups = {"JupyterHub-Admins"}
+
+    # ============================================
+    # ALTERNATIVE: GitHub OAuth (Commented out)
+    # ============================================
+    # 00-github-auth: |
+    #   from oauthenticator.github import GitHubOAuthenticator
+    #   c.JupyterHub.authenticator_class = GitHubOAuthenticator
+    #   c.GitHubOAuthenticator.client_id = "YOUR_CLIENT_ID"
+    #   c.GitHubOAuthenticator.client_secret = "YOUR_CLIENT_SECRET"
+    #   c.GitHubOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
+    #   c.Authenticator.admin_users = {"your-github-username"}
+    
+    # ============================================
+    # ALTERNATIVE: No Authentication (Testing only)
+    # ============================================
+    # 00-simple-auth: |
+    #   from jupyterhub.auth import DummyAuthenticator
+    #   c.JupyterHub.authenticator_class = DummyAuthenticator
+    #   c.DummyAuthenticator.password = ""
+    #   c.Authenticator.admin_users = {"admin"}
+
+singleuser:
+  image:
+    # Your Docker Hub image
+    name: docker.io/ermircjapi/jupyterhub-notebook
+    tag: latest
+    pullPolicy: Always
+  
+  storage:
+    type: dynamic
+    capacity: 10Gi
+    dynamic:
+      storageClass: local-path  # k3s creates storage automatically
+  
+  # Resource limits per user
+  cpu:
+    limit: 2
+    guarantee: 0.5
+  memory:
+    limit: 4G
+    guarantee: 1G
+  
+  # Start in JupyterLab
+  defaultUrl: /lab
+  
+  # GPU support - ENABLED
+  extraResource:
+    limits:
+      nvidia.com/gpu: "1"
+    guarantees:
+      nvidia.com/gpu: "1"
+
+# Auto-shutdown idle notebooks
+cull:
+  enabled: true
+  timeout: 3600   # 1 hour
+  every: 600      # check every 10 minutes
+
+# Keep image pulled
+prePuller:
+  continuous:
+    enabled: true

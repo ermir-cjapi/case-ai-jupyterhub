@@ -1,0 +1,288 @@
+# JupyterHub Helm Values - AIV Production Environment
+# This configuration aligns with AIV requirements for production deployment
+
+proxy:
+  secretToken: "CHANGE_ME_GENERATE_WITH_openssl_rand_hex_32"
+  service:
+    type: ClusterIP  # AIV load balancer handles external access
+  https:
+    enabled: false  # TLS terminated at load balancer/ingress
+  # High availability for production
+  chp:
+    replicas: 2  # Multiple proxy replicas
+
+hub:
+  service:
+    type: ClusterIP
+  
+  # High availability database (PostgreSQL recommended for production)
+  db:
+    type: postgres
+    # AIV IT will provide PostgreSQL connection details
+    url: "postgresql+psycopg2://jupyterhub:PASSWORD@postgres.aiv.internal:5432/jupyterhub"
+  
+  # HA configuration
+  replicas: 2  # Multiple hub instances for high availability
+  
+  config:
+    JupyterHub:
+      admin_access: true
+      # Allow named servers (users can have multiple servers)
+      allow_named_servers: true
+  
+  extraConfig:
+    # Entra ID (Azure Active Directory) Authentication - AIV Production
+    10-entra-id-auth: |
+      from oauthenticator.azuread import AzureAdOAuthenticator
+      c.JupyterHub.authenticator_class = AzureAdOAuthenticator
+      
+      # AIV Entra ID tenant details (provided by AIV IT)
+      c.AzureAdOAuthenticator.tenant_id = "AIV_TENANT_ID"
+      c.AzureAdOAuthenticator.client_id = "AIV_CLIENT_ID"
+      c.AzureAdOAuthenticator.client_secret = "AIV_CLIENT_SECRET"
+      c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.aiv.internal/hub/oauth_callback"
+      
+      # Group-based access control
+      c.AzureAdOAuthenticator.allowed_groups = {
+          "jupyterhub-users",      # Regular users
+          "data-science-team",     # Data scientists
+          "ml-engineers"           # ML engineers
+      }
+      
+      # Admin groups
+      c.AzureAdOAuthenticator.admin_groups = {"jupyterhub-admins"}
+      
+      # Manage groups - who can manage other users
+      c.AzureAdOAuthenticator.manage_groups = True
+    
+    # IAM integration for resource provisioning
+    20-iam-integration: |
+      # Custom spawner hooks for IAM resource management
+      # This will integrate with AIV's IAM solution for dynamic resource provisioning
+      import os
+      
+      async def custom_pre_spawn_hook(spawner):
+          """
+          Hook to provision IAM resources before spawning user server.
+          Integrate with AIV's IAM API here.
+          """
+          username = spawner.user.name
+          # Call AIV IAM API to provision resources
+          # Example: create user workspace, set up permissions, etc.
+          spawner.environment['IAV_USER'] = username
+          spawner.environment['IAV_PROJECT'] = os.environ.get('IAV_PROJECT', 'default')
+      
+      c.Spawner.pre_spawn_hook = custom_pre_spawn_hook
+
+singleuser:
+  # Container image - AIV Artifactory/Jfrog registry
+  image:
+    name: artifactory.aiv.internal/ml-platform/base-notebook
+    tag: v1
+    pullPolicy: IfNotPresent
+  
+  # Image pull secret for AIV registry
+  imagePullSecrets:
+    - name: aiv-artifactory-credentials
+  
+  # Storage - Ceph/S3 distributed storage
+  storage:
+    type: dynamic
+    capacity: 50Gi  # Larger capacity for production
+    dynamic:
+      storageClass: ceph-rbd  # AIV's Ceph storage class (or ceph-s3)
+    
+    # Shared storage for collaboration (Ceph S3 or NFS)
+    extraVolumes:
+      - name: shared-datasets
+        persistentVolumeClaim:
+          claimName: jupyterhub-shared-datasets
+      - name: shared-models
+        persistentVolumeClaim:
+          claimName: jupyterhub-shared-models
+    
+    extraVolumeMounts:
+      - name: shared-datasets
+        mountPath: /shared/datasets
+        readOnly: false
+      - name: shared-models
+        mountPath: /shared/models
+        readOnly: false
+  
+  # Production resource limits (adjust based on AIV cluster capacity)
+  cpu:
+    limit: 8
+    guarantee: 2
+  memory:
+    limit: 16G
+    guarantee: 4G
+  
+  # User server profiles - different tiers for different workloads
+  profileList:
+    - display_name: "CPU Only - Small"
+      description: "2 CPU cores, 8GB RAM - for light analysis and development"
+      default: true
+      kubespawner_override:
+        cpu_limit: 2
+        cpu_guarantee: 1
+        mem_limit: "8G"
+        mem_guarantee: "2G"
+        node_selector:
+          workload: cpu
+    
+    - display_name: "CPU Only - Medium"
+      description: "4 CPU cores, 16GB RAM - for data processing"
+      kubespawner_override:
+        cpu_limit: 4
+        cpu_guarantee: 2
+        mem_limit: "16G"
+        mem_guarantee: "4G"
+        node_selector:
+          workload: cpu
+    
+    - display_name: "CPU Only - Large"
+      description: "8 CPU cores, 32GB RAM - for heavy data processing"
+      kubespawner_override:
+        cpu_limit: 8
+        cpu_guarantee: 4
+        mem_limit: "32G"
+        mem_guarantee: "8G"
+        node_selector:
+          workload: cpu
+    
+    - display_name: "GPU - Standard"
+      description: "8 CPU cores, 32GB RAM, 1 GPU - for ML training"
+      kubespawner_override:
+        cpu_limit: 8
+        cpu_guarantee: 4
+        mem_limit: "32G"
+        mem_guarantee: "8G"
+        extra_resource_limits:
+          nvidia.com/gpu: "1"
+        node_selector:
+          workload: gpu
+        # GPU node tolerations (if AIV uses taints)
+        tolerations:
+          - key: "nvidia.com/gpu"
+            operator: "Exists"
+            effect: "NoSchedule"
+    
+    - display_name: "GPU - Large"
+      description: "16 CPU cores, 64GB RAM, 2 GPUs - for large-scale ML"
+      kubespawner_override:
+        cpu_limit: 16
+        cpu_guarantee: 8
+        mem_limit: "64G"
+        mem_guarantee: "16G"
+        extra_resource_limits:
+          nvidia.com/gpu: "2"
+        node_selector:
+          workload: gpu
+        tolerations:
+          - key: "nvidia.com/gpu"
+            operator: "Exists"
+            effect: "NoSchedule"
+  
+  # Default to JupyterLab
+  defaultUrl: /lab
+  
+  # Production environment variables
+  extraEnv:
+    EDITOR: "nano"
+    JUPYTERHUB_SINGLEUSER_APP: "jupyter_server.serverapp.ServerApp"
+    # AIV-specific environment
+    AIV_ENVIRONMENT: "production"
+    # Integration endpoints (provided by AIV)
+    ARTIFACTORY_URL: "https://artifactory.aiv.internal"
+    GITLAB_URL: "https://gitlab.aiv.internal"
+    # Code server for coding/IAC tasks
+    CODE_SERVER_ENABLED: "true"
+
+# Idle server culling - more aggressive for production cost control
+cull:
+  enabled: true
+  timeout: 7200      # 2 hours idle (adjust based on AIV policy)
+  every: 600         # Check every 10 minutes
+  concurrency: 20    # Higher for production scale
+  maxAge: 86400      # Max 24 hours server lifetime (optional)
+  removeNamedServers: false  # Keep named servers
+
+# Pre-pull images to all nodes for faster startup
+prePuller:
+  continuous:
+    enabled: true
+  hook:
+    enabled: true
+    pullOnlyOnChanges: false  # Always pull to ensure latest
+
+# Production ingress configuration
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx  # AIV uses NGINX ingress
+    nginx.ingress.kubernetes.io/proxy-body-size: "64m"  # Allow large notebook uploads
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    # WebSocket support for JupyterLab
+    nginx.ingress.kubernetes.io/websocket-services: "proxy-public"
+  
+  hosts:
+    - jupyterhub.aiv.internal
+  
+  tls:
+    - hosts:
+        - jupyterhub.aiv.internal
+      secretName: aiv-corporate-tls  # Corporate CA certificate
+
+# Production scheduling constraints
+scheduling:
+  userScheduler:
+    enabled: true  # Use dedicated user scheduler for better pod placement
+    replicas: 2    # HA for scheduler
+  
+  # Pod priority for production workloads
+  podPriority:
+    enabled: true
+  
+  # Affinity rules for multi-node cluster
+  userPods:
+    nodeAffinity:
+      matchNodePurpose:
+        require: true  # Require nodes labeled for JupyterHub
+
+# Production monitoring and metrics
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: aiv-prometheus  # AIV's Prometheus release name
+
+# Resource quotas for production
+quotas:
+  enabled: true
+  # Example: limit total pods per user
+  pods: "5"
+
+# Network policies for production security
+networkPolicy:
+  enabled: true
+  # Allow connections from ingress and within namespace
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+  egress: []
+
+# Additional security context for production
+securityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+
+

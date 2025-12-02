@@ -1,0 +1,44 @@
+{
+  "title": "JupyterHub V1 Overview",
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Active Users",
+      "id": 1,
+      "datasource": null,
+      "targets": [
+        {
+          "expr": "sum(jupyterhub_active_users)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Singleuser CPU Usage",
+      "id": 2,
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"jupyterhub-test\",image!=\"\"}[5m])) by (pod)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Singleuser Memory Usage",
+      "id": 3,
+      "targets": [
+        {
+          "expr": "sum(container_memory_usage_bytes{namespace=\"jupyterhub-test\",image!=\"\"}) by (pod)",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
+
+

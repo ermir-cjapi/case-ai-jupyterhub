@@ -1,0 +1,20 @@
+# Service for JupyterHub Hub
+apiVersion: v1
+kind: Service
+metadata:
+  name: hub
+  namespace: jupyterhub-test
+  labels:
+    app: jupyterhub
+    component: hub
+spec:
+  type: ClusterIP
+  selector:
+    app: jupyterhub
+    component: hub
+  ports:
+  - port: 8081
+    targetPort: 8081
+    protocol: TCP
+    name: hub
+

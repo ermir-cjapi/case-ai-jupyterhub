@@ -1,0 +1,74 @@
+# JupyterHub Hub - The brain that manages everything
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hub
+  namespace: jupyterhub-test
+  labels:
+    app: jupyterhub
+    component: hub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jupyterhub
+      component: hub
+  template:
+    metadata:
+      labels:
+        app: jupyterhub
+        component: hub
+    spec:
+      serviceAccountName: jupyterhub
+      containers:
+      - name: hub
+        image: jupyterhub/k8s-hub:3.2.1
+        ports:
+        - containerPort: 8081
+          name: hub
+        env:
+        # Proxy secret token
+        - name: CONFIGPROXY_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: jupyterhub-secrets
+              key: proxy-token
+        
+        # Azure AD credentials (optional - can also be in ConfigMap)
+        # - name: AZURE_TENANT_ID
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: jupyterhub-secrets
+        #       key: azure-tenant-id
+        
+        volumeMounts:
+        # JupyterHub config
+        - name: config
+          mountPath: /etc/jupyterhub/jupyterhub_config.py
+          subPath: jupyterhub_config.py
+        
+        # Database storage (SQLite)
+        - name: hub-db
+          mountPath: /srv/jupyterhub
+        
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1
+            memory: 1Gi
+        
+        command:
+        - jupyterhub
+        - --config
+        - /etc/jupyterhub/jupyterhub_config.py
+      
+      volumes:
+      - name: config
+        configMap:
+          name: jupyterhub-config
+      - name: hub-db
+        persistentVolumeClaim:
+          claimName: hub-db-dir
+

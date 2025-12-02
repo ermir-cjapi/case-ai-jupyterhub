@@ -1,0 +1,21 @@
+# Service for JupyterHub Proxy
+# This is what Cloudflare tunnel connects to
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxy-public
+  namespace: jupyterhub-test
+  labels:
+    app: jupyterhub
+    component: proxy
+spec:
+  type: ClusterIP
+  selector:
+    app: jupyterhub
+    component: proxy
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+
