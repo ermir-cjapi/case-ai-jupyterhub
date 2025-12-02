@@ -10,6 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     vim \
+    ncurses-base \
+    libncurses6 \
+    libtinfo6 \
     && rm -rf /var/lib/apt/lists/*
 
 USER ${NB_UID}
