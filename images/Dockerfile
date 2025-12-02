@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 USER ${NB_UID}
 
 # Core data science libraries (like scipy-notebook)
-RUN pip install --no-cache-dir \
+RUN python -m pip install --no-cache-dir \
     numpy \
     pandas \
     scipy \
@@ -28,15 +28,15 @@ RUN pip install --no-cache-dir \
 
 # Deep Learning with GPU support
 # PyTorch with CUDA 11.8 support
-RUN pip install --no-cache-dir \
+RUN python -m pip install --no-cache-dir \
     torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # TensorFlow with GPU support
-RUN pip install --no-cache-dir \
+RUN python -m pip install --no-cache-dir \
     tensorflow[and-cuda]
 
 # Additional ML/AI libraries
-RUN pip install --no-cache-dir \
+RUN python -m pip install --no-cache-dir \
     transformers \
     datasets \
     accelerate \
@@ -44,14 +44,14 @@ RUN pip install --no-cache-dir \
     pillow
 
 # Data processing
-RUN pip install --no-cache-dir \
+RUN python -m pip install --no-cache-dir \
     h5py \
     pytables \
     sqlalchemy \
     openpyxl
 
 # Jupyter extensions
-RUN pip install --no-cache-dir \
+RUN python -m pip install --no-cache-dir \
     jupyterlab-git \
     ipympl
 
