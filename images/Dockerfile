@@ -1,43 +1,36 @@
-FROM jupyter/minimal-notebook:latest
+# Use scipy-notebook which already includes numpy, pandas, scipy, matplotlib, etc.
+FROM jupyter/scipy-notebook:latest
 
 USER root
 
-# System dependencies
+# System dependencies for additional packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     build-essential \
     curl \
     wget \
     vim \
-    libtinfo6 \
-  && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 USER ${NB_UID}
 
-# Core data science libraries (like scipy-notebook)
-RUN python -m pip install --no-cache-dir \
-    numpy \
-    pandas \
-    scipy \
-    scikit-learn \
-    matplotlib \
+# Additional data science libraries not in scipy-notebook
+RUN pip install --no-cache-dir \
     seaborn \
     plotly \
-    jupyterlab \
-    ipywidgets \
-    notebook
+    ipywidgets
 
 # Deep Learning with GPU support
 # PyTorch with CUDA 11.8 support
-RUN python -m pip install --no-cache-dir \
+RUN pip install --no-cache-dir \
     torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # TensorFlow with GPU support
-RUN python -m pip install --no-cache-dir \
+RUN pip install --no-cache-dir \
     tensorflow[and-cuda]
 
 # Additional ML/AI libraries
-RUN python -m pip install --no-cache-dir \
+RUN pip install --no-cache-dir \
     transformers \
     datasets \
     accelerate \
@@ -45,15 +38,18 @@ RUN python -m pip install --no-cache-dir \
     pillow
 
 # Data processing
-RUN python -m pip install --no-cache-dir \
+RUN pip install --no-cache-dir \
     h5py \
     pytables \
     sqlalchemy \
     openpyxl
 
 # Jupyter extensions
-RUN python -m pip install --no-cache-dir \
+RUN pip install --no-cache-dir \
     jupyterlab-git \
     ipympl
 
 ENV JUPYTER_ENABLE_LAB=yes
+
+# Set working directory
+WORKDIR /home/${NB_USER}
