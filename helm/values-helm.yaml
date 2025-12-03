@@ -97,6 +97,10 @@ singleuser:
   # Start in JupyterLab
   defaultUrl: /lab
   
+  # Disable cloud metadata blocking (requires privileged init container)
+  cloudMetadata:
+    blockWithIptables: false
+  
   # ============================================
   # GPU CONFIGURATION
   # ============================================
