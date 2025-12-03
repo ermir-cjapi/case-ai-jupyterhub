@@ -2,8 +2,13 @@ FROM jupyter/scipy-notebook:latest
 
 USER root
 
-# System dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends git vim && rm -rf /var/lib/apt/lists/*
+# System dependencies including ncurses library (fixes libtinfo.so.6 error)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    vim \
+    libncurses6 \
+    libtinfo6 \
+    && rm -rf /var/lib/apt/lists/*
 
 USER ${NB_UID}
 
