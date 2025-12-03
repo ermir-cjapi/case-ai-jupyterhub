@@ -76,16 +76,10 @@ hub:
     #   c.Authenticator.admin_users = {"admin"}
 
 singleuser:
-  # Override command args - use extraPodConfig for custom command
-  extraPodConfig:
-    containers:
-      - name: notebook
-        command: ["/opt/conda/bin/python", "-m", "jupyterhub.singleuser"]
-  
   image:
-    # Your Docker Hub image
+    # Your Docker Hub image with jupyterhub-singleuser wrapper script
     name: docker.io/ermircjapi/jupyterhub-notebook
-    tag: v1.1  # Update this when you push a new image version
+    tag: v1.2  # Updated with proper jupyterhub-singleuser executable
     pullPolicy: Always
   
   storage:

@@ -72,6 +72,10 @@ RUN pip install --no-cache-dir \
     jupyterlab-git \
     nbgitpuller
 
+# Create jupyterhub-singleuser wrapper script
+RUN echo '#!/bin/bash\nexec /opt/conda/bin/python3 -m jupyterhub.singleuser "$@"' > /opt/conda/bin/jupyterhub-singleuser && \
+    chmod +x /opt/conda/bin/jupyterhub-singleuser
+
 ENV JUPYTER_ENABLE_LAB=yes
 
 # Default working directory for notebooks
