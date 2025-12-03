@@ -101,9 +101,6 @@ singleuser:
   cloudMetadata:
     blockWithIptables: false
   
-  # Use default scheduler instead of user-scheduler
-  schedulerName: default-scheduler
-  
   # ============================================
   # GPU CONFIGURATION
   # ============================================
@@ -140,3 +137,8 @@ cull:
 prePuller:
   continuous:
     enabled: true
+
+# Disable user-scheduler (use default K3s scheduler)
+scheduling:
+  userScheduler:
+    enabled: false
