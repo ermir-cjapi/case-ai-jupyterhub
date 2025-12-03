@@ -5,7 +5,9 @@ proxy:
   # Generate with: openssl rand -hex 32
   secretToken: "a7c63b7d74e9628282eca95874fa7a9f69797f027512bb6d9f0636bb9689307e"
   service:
-    type: ClusterIP  # Cloudflare connects to ClusterIP, not LoadBalancer
+    type: NodePort  # Expose on fixed port for Cloudflare tunnel
+    nodePorts:
+      http: 30080  # Fixed port - update Cloudflare to localhost:30080
   https:
     enabled: false  # Cloudflare handles TLS
 
@@ -120,12 +122,11 @@ singleuser:
   #   ./setup-gpu-timeslicing.sh
   # ============================================
   
-  # TEMPORARILY DISABLED FOR TESTING - RE-ENABLE AFTER BASIC SPAWNING WORKS
-  # extraResource:
-  #   limits:
-  #     nvidia.com/gpu: "1"  # Each user gets 1 GPU slice (1/4 of RTX 5090 if time-slicing enabled)
-  #   guarantees:
-  #     nvidia.com/gpu: "1"
+  extraResource:
+    limits:
+      nvidia.com/gpu: "1"  # Each user gets 1 GPU slice (1/4 of RTX 5090 if time-slicing enabled)
+    guarantees:
+      nvidia.com/gpu: "1"
 
 # Auto-shutdown idle notebooks
 cull:

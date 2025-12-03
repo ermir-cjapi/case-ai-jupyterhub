@@ -52,8 +52,10 @@ RUN pip install --no-cache-dir \
 
 ######################################################################
 # Jupyter stack
+# CRITICAL: jupyterhub package provides jupyterhub-singleuser command
 ######################################################################
 RUN pip install --no-cache-dir \
+    jupyterhub \
     jupyterlab \
     notebook \
     jupyterlab-git
