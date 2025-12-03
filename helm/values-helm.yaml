@@ -79,7 +79,7 @@ singleuser:
   image:
     # Your Docker Hub image
     name: docker.io/ermircjapi/jupyterhub-notebook
-    tag: latest
+    tag: v1.0  # Update this when you push a new image version
     pullPolicy: Always
   
   storage:

@@ -50,6 +50,17 @@ RUN pip install --no-cache-dir \
     accelerate \
     opencv-python-headless
 
+# Essential data science libraries
+RUN pip install --no-cache-dir \
+    scikit-learn \
+    pandas \
+    numpy \
+    matplotlib \
+    seaborn \
+    plotly \
+    scipy \
+    statsmodels
+
 ######################################################################
 # Jupyter stack
 # CRITICAL: jupyterhub package provides jupyterhub-singleuser command
@@ -58,7 +69,8 @@ RUN pip install --no-cache-dir \
     jupyterhub \
     jupyterlab \
     notebook \
-    jupyterlab-git
+    jupyterlab-git \
+    nbgitpuller
 
 ENV JUPYTER_ENABLE_LAB=yes
 
