@@ -76,10 +76,13 @@ hub:
     #   c.Authenticator.admin_users = {"admin"}
 
 singleuser:
+  # Override default command to use Python module form
+  cmd: ["python", "-m", "jupyterhub.singleuser"]
+  
   image:
     # Your Docker Hub image
     name: docker.io/ermircjapi/jupyterhub-notebook
-    tag: v1.0  # Update this when you push a new image version
+    tag: v1.1  # Update this when you push a new image version
     pullPolicy: Always
   
   storage:
