@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 REGISTRY="${REGISTRY:-registry.example.com}"
-IMAGE_NAME="${IMAGE_NAME:-iav/base-notebook}"
+IMAGE_NAME="${IMAGE_NAME:-gpu-notebook}"
 IMAGE_TAG="${IMAGE_TAG:-v1}"
 
 FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
