@@ -88,17 +88,10 @@ singleuser:
     dynamic:
       storageClass: local-path  # k3s creates storage automatically
   
-  # Fix PVC ownership with init container
-  initContainers:
-    - name: volume-permissions
-      image: busybox
-      command: ["sh", "-c", "chown -R 1000:100 /home/jovyan/work && chmod -R 755 /home/jovyan/work"]
-      securityContext:
-        runAsUser: 0
-      volumeMounts:
-        - name: volume-{username}
-          mountPath: /home/jovyan/work
-          subPath: "{username}"
+  # Fix PVC permissions with pod security context
+  podSecurityContext:
+    fsGroup: 100
+    fsGroupChangePolicy: "OnRootMismatch"
   
   # Resource limits per user
   cpu:
