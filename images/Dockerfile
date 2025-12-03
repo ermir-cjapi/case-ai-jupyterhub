@@ -51,6 +51,12 @@ RUN pip install --no-cache-dir \
     jupyterlab-git \
     nbgitpuller
 
+# Ensure work directory exists and has correct permissions
+USER root
+RUN mkdir -p /home/jovyan/work && \
+    chown -R ${NB_UID}:${NB_GID} /home/jovyan/work
+USER ${NB_UID}
+
 ENV JUPYTER_ENABLE_LAB=yes
 WORKDIR /home/jovyan/work
 
