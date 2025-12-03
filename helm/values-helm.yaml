@@ -92,12 +92,13 @@ singleuser:
   initContainers:
     - name: volume-permissions
       image: busybox
-      command: ["sh", "-c", "chown -R 1000:100 /home/jovyan && chmod -R 755 /home/jovyan"]
+      command: ["sh", "-c", "chown -R 1000:100 /home/jovyan/work && chmod -R 755 /home/jovyan/work"]
       securityContext:
         runAsUser: 0
       volumeMounts:
-        - name: volume
-          mountPath: /home/jovyan
+        - name: volume-{username}
+          mountPath: /home/jovyan/work
+          subPath: "{username}"
   
   # Resource limits per user
   cpu:
