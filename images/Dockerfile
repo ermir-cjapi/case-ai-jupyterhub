@@ -1,56 +1,42 @@
 ######################################################################
-# GPU-enabled base image for NVIDIA server
-# - Uses official PyTorch CUDA runtime image as a solid GPU foundation
-# - We add JupyterLab, TensorFlow, and extra ML libraries on top
+# Alternative Dockerfile using official JupyterHub GPU base image
+# Use this if the PyTorch base continues to have issues
 ######################################################################
 
-FROM pytorch/pytorch:2.3.0-cuda11.8-cudnn8-runtime
+FROM quay.io/jupyterhub/singleuser:5.4.2
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-######################################################################
-# System dependencies
-######################################################################
 USER root
 
+######################################################################
+# Install CUDA toolkit and GPU drivers
+######################################################################
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    cuda-toolkit-11-8 \
     git \
     vim \
-    ca-certificates \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
-######################################################################
-# Create a non-root user compatible with JupyterHub defaults
-# - Name: jovyan
-# - Home: /home/jovyan
-######################################################################
-RUN useradd -m -s /bin/bash jovyan && \
-    chown -R jovyan:jovyan /home/jovyan
-
-USER jovyan
-WORKDIR /home/jovyan
+USER ${NB_UID}
 
 ######################################################################
-# Python / ML stack
-# - PyTorch is already included from the base image
-# - We add TensorFlow GPU, Transformers, etc.
+# GPU Deep Learning Libraries
 ######################################################################
 
-# Upgrade pip first to avoid dependency resolution issues
-RUN pip install --no-cache-dir --upgrade pip
+# PyTorch with CUDA 11.8
+RUN pip install --no-cache-dir \
+    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
-# TensorFlow with GPU support
+# TensorFlow with GPU
 RUN pip install --no-cache-dir tensorflow[and-cuda]
 
-# Additional ML/AI libraries
+# ML/AI libraries
 RUN pip install --no-cache-dir \
     transformers \
     datasets \
     accelerate \
     opencv-python-headless
 
-# Essential data science libraries
+# Data science stack
 RUN pip install --no-cache-dir \
     scikit-learn \
     pandas \
@@ -61,30 +47,11 @@ RUN pip install --no-cache-dir \
     scipy \
     statsmodels
 
-######################################################################
-# Jupyter stack
-# CRITICAL: jupyterhub package provides jupyterhub-singleuser command
-######################################################################
+# Git integration
 RUN pip install --no-cache-dir \
-    jupyterhub \
-    jupyterlab \
-    notebook \
     jupyterlab-git \
     nbgitpuller
 
-# Switch back to root to create wrapper script
-USER root
-
-# Create jupyterhub-singleuser wrapper script
-RUN echo '#!/bin/bash' > /opt/conda/bin/jupyterhub-singleuser && \
-    echo 'exec /opt/conda/bin/python3 -m jupyterhub.singleuser "$@"' >> /opt/conda/bin/jupyterhub-singleuser && \
-    chmod +x /opt/conda/bin/jupyterhub-singleuser
-
-# Switch back to jovyan user
-USER jovyan
-
 ENV JUPYTER_ENABLE_LAB=yes
-
-# Default working directory for notebooks
 WORKDIR /home/jovyan/work
 

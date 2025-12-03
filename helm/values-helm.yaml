@@ -77,9 +77,9 @@ hub:
 
 singleuser:
   image:
-    # Your Docker Hub image with jupyterhub-singleuser wrapper script
+    # Official JupyterHub base with GPU libraries
     name: docker.io/ermircjapi/jupyterhub-notebook
-    tag: v1.2  # Updated with proper jupyterhub-singleuser executable
+    tag: v2.0  # Official base - jupyterhub-singleuser works out of the box
     pullPolicy: Always
   
   storage:
