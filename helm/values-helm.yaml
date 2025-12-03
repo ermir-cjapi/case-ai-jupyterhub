@@ -116,11 +116,12 @@ singleuser:
   #   ./setup-gpu-timeslicing.sh
   # ============================================
   
-  extraResource:
-    limits:
-      nvidia.com/gpu: "1"  # Each user gets 1 GPU slice (1/4 of RTX 5090 if time-slicing enabled)
-    guarantees:
-      nvidia.com/gpu: "1"
+  # TEMPORARILY DISABLED FOR TESTING - RE-ENABLE AFTER BASIC SPAWNING WORKS
+  # extraResource:
+  #   limits:
+  #     nvidia.com/gpu: "1"  # Each user gets 1 GPU slice (1/4 of RTX 5090 if time-slicing enabled)
+  #   guarantees:
+  #     nvidia.com/gpu: "1"
 
 # Auto-shutdown idle notebooks
 cull:
