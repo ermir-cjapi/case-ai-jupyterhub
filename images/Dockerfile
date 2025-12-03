@@ -8,10 +8,9 @@ FROM quay.io/jupyterhub/singleuser:5.4.2
 USER root
 
 ######################################################################
-# Install CUDA toolkit and GPU drivers
+# Install system packages
 ######################################################################
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    cuda-toolkit-11-8 \
     git \
     vim \
     && rm -rf /var/lib/apt/lists/*
