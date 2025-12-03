@@ -76,8 +76,8 @@ hub:
     #   c.Authenticator.admin_users = {"admin"}
 
 singleuser:
-  # Override default command to use Python module form
-  cmd: ["python", "-m", "jupyterhub.singleuser"]
+  # Override default command to use Python module form with full path
+  cmd: ["/opt/conda/bin/python", "-m", "jupyterhub.singleuser"]
   
   image:
     # Your Docker Hub image
