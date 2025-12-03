@@ -88,11 +88,6 @@ singleuser:
     dynamic:
       storageClass: local-path  # k3s creates storage automatically
   
-  # Fix PVC permissions with pod security context
-  podSecurityContext:
-    fsGroup: 100
-    fsGroupChangePolicy: "OnRootMismatch"
-  
   # Resource limits per user
   cpu:
     limit: 2
@@ -103,6 +98,12 @@ singleuser:
   
   # Start in JupyterLab
   defaultUrl: /lab
+  
+  # Fix PVC permissions using fsGroup
+  extraPodConfig:
+    securityContext:
+      fsGroup: 100
+      fsGroupChangePolicy: "OnRootMismatch"
   
   # Disable cloud metadata blocking (requires privileged init container)
   cloudMetadata:
