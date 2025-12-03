@@ -77,9 +77,9 @@ hub:
 
 singleuser:
   image:
-    # Official JupyterHub base with GPU libraries
+    # Official JupyterHub base with GPU libraries and fixed permissions
     name: docker.io/ermircjapi/jupyterhub-notebook
-    tag: v2.0  # Official base - jupyterhub-singleuser works out of the box
+    tag: v2.1  # Stable working version with GPU sharing
     pullPolicy: Always
   
   storage:
