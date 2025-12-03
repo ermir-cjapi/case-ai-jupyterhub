@@ -101,6 +101,9 @@ singleuser:
   cloudMetadata:
     blockWithIptables: false
   
+  # Use default scheduler instead of user-scheduler
+  schedulerName: default-scheduler
+  
   # ============================================
   # GPU CONFIGURATION
   # ============================================
