@@ -79,7 +79,7 @@ singleuser:
   image:
     # Official JupyterHub base with GPU libraries
     name: docker.io/ermircjapi/jupyterhub-notebook
-    tag: v2.2  # Uses /home/jovyan as WORKDIR (no PVC permission issues)
+    tag: v2.3  # PyTorch nightly for RTX 5090 support (sm_120)
     pullPolicy: Always
   
   storage:

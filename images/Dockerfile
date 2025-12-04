@@ -21,9 +21,9 @@ USER ${NB_UID}
 # GPU Deep Learning Libraries
 ######################################################################
 
-# PyTorch with CUDA 11.8
-RUN pip install --no-cache-dir \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# PyTorch nightly with CUDA 12.4 (supports RTX 5090 sm_120)
+RUN pip install --no-cache-dir --pre \
+    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124
 
 # TensorFlow with GPU
 RUN pip install --no-cache-dir tensorflow[and-cuda]
