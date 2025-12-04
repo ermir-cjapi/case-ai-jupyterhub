@@ -77,9 +77,9 @@ hub:
 
 singleuser:
   image:
-    # Official JupyterHub base with GPU libraries and fixed permissions
+    # Official JupyterHub base with GPU libraries
     name: docker.io/ermircjapi/jupyterhub-notebook
-    tag: v2.1  # Stable working version with GPU sharing
+    tag: v2.2  # Uses /home/jovyan as WORKDIR (no PVC permission issues)
     pullPolicy: Always
   
   storage:
