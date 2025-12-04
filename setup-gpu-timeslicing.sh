@@ -18,10 +18,12 @@ echo "=========================================="
 echo ""
 
 # Configuration - Change this to adjust users per GPU
-REPLICAS=4  # Options: 2, 4, 8, 10
+REPLICAS=8  # Options: 2, 4, 8, 10, 16
 # 2 = 2 users per GPU (50% each when all active)
-# 4 = 4 users per GPU (25% each when all active) ⭐ Recommended
-# 8 = 8 users per GPU (12.5% each when all active)
+# 4 = 4 users per GPU (25% each when all active)
+# 8 = 8 users per GPU (12.5% each when all active) ⭐ Recommended for RTX 5090
+# 10 = 10 users per GPU (10% each when all active)
+# 16 = 16 users per GPU (6.25% each when all active)
 
 echo "📋 Configuration:"
 echo "   Time-slicing replicas: ${REPLICAS}"

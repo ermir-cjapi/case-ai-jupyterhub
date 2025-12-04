@@ -88,14 +88,6 @@ singleuser:
     dynamic:
       storageClass: local-path  # k3s creates storage automatically
   
-  # Resource limits per user
-  cpu:
-    limit: 2
-    guarantee: 0.5
-  memory:
-    limit: 4G
-    guarantee: 1G
-  
   # Start in JupyterLab
   defaultUrl: /lab
   
@@ -110,15 +102,55 @@ singleuser:
     blockWithIptables: false
   
   # ============================================
-  # GPU CONFIGURATION
+  # USER PROFILES - Choose CPU or GPU at login
+  # ============================================
+  # Users select profile when logging in:
+  # - CPU Only: Always available, for data exploration/light work
+  # - GPU Enabled: Limited to 8 concurrent users (with time-slicing)
+  # ============================================
+  
+  profileList:
+    - display_name: "💻 CPU Only - Data Exploration"
+      description: |
+        🚀 Always available (no waiting)
+        📊 Perfect for: data analysis, visualization, pandas/numpy
+        ⚡ 2 CPUs, 4GB RAM
+        ❌ No GPU access
+      default: true
+      kubespawner_override:
+        cpu_limit: 2
+        cpu_guarantee: 0.5
+        mem_limit: "4G"
+        mem_guarantee: "1G"
+        # No GPU resources
+    
+    - display_name: "🎮 GPU Enabled - ML/AI Training"
+      description: |
+        🔥 1 GPU slice (RTX 5090)
+        🤖 Perfect for: PyTorch, TensorFlow, deep learning
+        ⚡ 4 CPUs, 8GB RAM, 1 GPU
+        ⏳ May queue if 8 users active
+      kubespawner_override:
+        cpu_limit: 4
+        cpu_guarantee: 1
+        mem_limit: "8G"
+        mem_guarantee: "2G"
+        extra_resource_limits:
+          nvidia.com/gpu: "1"
+        extra_resource_guarantees:
+          nvidia.com/gpu: "1"
+  
+  # ============================================
+  # GPU TIME-SLICING CONFIGURATION
   # ============================================
   # IMPORTANT: GPU Time-Slicing must be configured first!
   # See: GPU-SHARING.md for details
   # 
-  # With time-slicing enabled (replicas=4):
-  # - 1 physical GPU becomes 4 virtual GPUs
-  # - 4 users can work simultaneously
-  # - Each gets ~25% when all active, 100% when alone
+  # With time-slicing enabled (replicas=8):
+  # - 1 physical GPU becomes 8 virtual GPUs
+  # - 8 users can work simultaneously on GPU profile
+  # - Each gets ~12.5% when all active, 100% when alone
+  # - Unlimited users on CPU-only profile
   #
   # Without time-slicing (default):
   # - Only 1 user at a time per physical GPU
@@ -127,12 +159,6 @@ singleuser:
   # To enable time-slicing on your cluster (RUN ONCE):
   #   ./setup-gpu-timeslicing.sh
   # ============================================
-  
-  extraResource:
-    limits:
-      nvidia.com/gpu: "1"  # Each user gets 1 GPU slice (1/4 of RTX 5090 if time-slicing enabled)
-    guarantees:
-      nvidia.com/gpu: "1"
 
 # Auto-shutdown idle notebooks
 cull:
