@@ -115,19 +115,19 @@ hub:
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       
-      # Tell oauthenticator where to find groups in Azure AD token
-      c.AzureAdOAuthenticator.auth_state_groups_key = "groups"
+      # Fetch groups from Microsoft Graph API instead of token
+      c.AzureAdOAuthenticator.populate_groups_from_auth = True
       
       # Define which groups can access JupyterHub
-      c.AzureAdOAuthenticator.allowed_groups = [
+      c.AzureAdOAuthenticator.allowed_groups = {
           "6543851f-fd97-40e8-b097-ab5a71e44ef2",  # JupyterHub-Users
           "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
-      ]
+      }
       
       # Define which groups have admin access
-      c.AzureAdOAuthenticator.admin_groups = [
+      c.AzureAdOAuthenticator.admin_groups = {
           "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
-      ]
+      }
       
       # ============================================
       # DEBUG LOGGING - See what's happening
