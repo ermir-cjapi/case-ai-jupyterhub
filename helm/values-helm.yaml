@@ -60,13 +60,24 @@ hub:
       import sys
       import site
       print("Upgrading oauthenticator to v17+...")
-      # Install to user directory (this will take precedence over system install)
+      
+      # Install to user directory
       subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "--upgrade", "--force-reinstall", "oauthenticator>=17.0.0"])
-      # Ensure user site-packages is in the path (should be by default, but make sure)
+      
+      # Put user site-packages at the FRONT of sys.path so it's checked first
       user_site = site.getusersitepackages()
-      if user_site not in sys.path:
-          sys.path.insert(0, user_site)
+      if user_site in sys.path:
+          sys.path.remove(user_site)
+      sys.path.insert(0, user_site)
+      
+      # Remove any already-imported oauthenticator modules from cache
+      modules_to_remove = [key for key in sys.modules.keys() if key.startswith('oauthenticator')]
+      for mod in modules_to_remove:
+          del sys.modules[mod]
+      
       print(f"oauthenticator v17+ installed to: {user_site}")
+      print(f"Removed {len(modules_to_remove)} cached modules")
+      print("sys.path[0] =", sys.path[0])
       print("oauthenticator upgrade complete!")
     
     # ============================================
