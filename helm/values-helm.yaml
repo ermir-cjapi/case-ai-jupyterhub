@@ -101,6 +101,9 @@ hub:
           "JupyterHub-Admins"      # Admins can manage servers and access user notebooks
       }
       
+      # Allow group-based admin management
+      c.AzureAdOAuthenticator.manage_groups = True
+      
       # ============================================
       # ALTERNATIVE: Email-Based Access Control (Not Recommended)
       # ============================================
