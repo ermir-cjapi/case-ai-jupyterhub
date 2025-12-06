@@ -89,121 +89,33 @@ hub:
       c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
       
       # ============================================
-      # GROUP-BASED ACCESS CONTROL (RECOMMENDED)
+      # GROUP-BASED AUTHORIZATION
       # ============================================
-      # Azure AD sends group Object IDs (GUIDs), NOT group names!
-      #
-      # To get your group Object IDs:
-      # 1. Azure Portal → Microsoft Entra ID → Groups
-      # 2. Click on "JupyterHub-Users" → Properties → Copy "Object ID"
-      # 3. Click on "JupyterHub-Admins" → Properties → Copy "Object ID"
-      # 4. Replace the example UUIDs below with your actual Object IDs
-      #
-      # Also configure Azure AD app to include groups in token:
-      # Azure Portal → App registrations → JupyterHub → Token configuration
-      # → Add groups claim → Select "Security groups"
-      # ============================================
-      
-      # ============================================
-      # GROUP-BASED AUTHORIZATION (oauthenticator v16+)
-      # ============================================
-      
-      # NOTE: Group Object IDs from Azure AD:
+      # IMPORTANT: In Azure Portal, you MUST edit the app manifest:
+      # Set "groupMembershipClaims": "SecurityGroup"
+      # 
+      # Group IDs (Azure AD Object IDs, not names!):
       # - JupyterHub-Users:  6543851f-fd97-40e8-b097-ab5a71e44ef2
       # - JupyterHub-Admins: d6c49ed5-eefc-48c4-90d0-2026f5fe3916
-      
-      # ============================================
-      # GROUP-BASED AUTHORIZATION VIA POST-AUTH HOOK
-      # ============================================
-      # Note: AzureAdOAuthenticator's built-in allowed_groups/admin_groups
-      # don't work reliably when groups aren't in the token. Instead, we:
-      # 1. Fetch groups from Microsoft Graph API in post_auth_hook
-      # 2. Block users not in allowed groups
-      # 3. Grant admin status based on group membership
-      #
-      # Group IDs:
-      # - JupyterHub-Admins: d6c49ed5-eefc-48c4-90d0-2026f5fe3916
-      # - JupyterHub-Users:  6543851f-fd97-40e8-b097-ab5a71e44ef2
       # ============================================
       
-      # Allowed Azure AD groups (users must be in at least one)
-      ALLOWED_GROUPS = {
+      # Enable group management
+      c.AzureAdOAuthenticator.manage_groups = True
+      
+      # Tell oauthenticator where groups are in the auth state
+      c.AzureAdOAuthenticator.auth_state_groups_key = "user.groups"
+      
+      # Restrict access to users in these Azure AD groups (use group IDs)
+      c.AzureAdOAuthenticator.allowed_groups = {
           "6543851f-fd97-40e8-b097-ab5a71e44ef2",  # JupyterHub-Users
           "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
       }
       
-      ADMIN_GROUP = "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"  # JupyterHub-Admins
+      # Grant admin access to users in this Azure AD group (use group ID)
+      c.AzureAdOAuthenticator.admin_groups = {
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
+      }
       
-      # Must allow_all for post_auth_hook to run
-      c.Authenticator.allow_all = True
-      c.AzureAdOAuthenticator.manage_groups = False
-      
-      # Post-authentication hook to fetch groups and set admin status
-      import aiohttp
-      
-      async def post_auth_hook(authenticator, handler, authentication):
-          """Fetch user groups from Microsoft Graph API and enforce access control"""
-          from jupyterhub.handlers import BaseHandler
-          
-          username = authentication['name']
-          auth_state = authentication.get('auth_state', {})
-          access_token = auth_state.get('access_token')
-          
-          if not access_token:
-              authenticator.log.warning(f"No access token for {username}, denying access")
-              return None
-          
-          # Fetch groups from Microsoft Graph API
-          headers = {
-              "Authorization": f"Bearer {access_token}",
-              "Content-Type": "application/json"
-          }
-          url = "https://graph.microsoft.com/v1.0/me/memberOf"
-          
-          try:
-              async with aiohttp.ClientSession() as session:
-                  async with session.get(url, headers=headers) as resp:
-                      if resp.status == 200:
-                          data = await resp.json()
-                          # Extract group IDs
-                          user_groups = set([
-                              group['id'] 
-                              for group in data.get('value', []) 
-                              if group.get('@odata.type') == '#microsoft.graph.group'
-                          ])
-                          authenticator.log.info(f"User {username} is in {len(user_groups)} groups")
-                          
-                          # Check if user is in any allowed group
-                          if not user_groups.intersection(ALLOWED_GROUPS):
-                              authenticator.log.warning(
-                                  f"User {username} not in any allowed groups. "
-                                  f"User groups: {user_groups}, Allowed: {ALLOWED_GROUPS}"
-                              )
-                              return None  # Deny access
-                          
-                          # Grant admin if in admin group
-                          if ADMIN_GROUP in user_groups:
-                              authentication['admin'] = True
-                              authenticator.log.info(f"User {username} granted admin access")
-                          else:
-                              authenticator.log.info(f"User {username} granted regular user access")
-                          
-                          return authentication
-                      else:
-                          authenticator.log.error(f"Failed to fetch groups for {username}: HTTP {resp.status}")
-                          return None  # Deny access if can't fetch groups
-          except Exception as e:
-              authenticator.log.error(f"Error fetching groups for {username}: {e}")
-              return None  # Deny access on error
-      
-      c.Authenticator.post_auth_hook = post_auth_hook
-      
-      # ============================================
-      # DEBUG LOGGING (Optional - can be removed in production)
-      # ============================================
-      import logging
-      logging.getLogger('oauthenticator').setLevel(logging.INFO)
-      c.JupyterHub.log_level = 'INFO'
       
       # ============================================
       # OPTION B: Use Group Names (requires Azure AD Premium)
