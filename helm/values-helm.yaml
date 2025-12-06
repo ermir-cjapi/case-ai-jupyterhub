@@ -131,23 +131,31 @@ hub:
       c.AzureAdOAuthenticator.manage_groups = True
       
       # DEBUG: Custom user_info hook to see what Azure returns
-      import json
-      import logging
       async def debug_user_info(authenticator, handler, auth_model):
-          log = logging.getLogger('jupyterhub')
-          log.info("=" * 80)
-          log.info("DEBUG: Full auth_model structure:")
-          log.info(json.dumps({k: str(v)[:200] for k, v in auth_model.items()}, indent=2))
+          print("=" * 80)
+          print("DEBUG: auth_model keys:", list(auth_model.keys()))
+          print("DEBUG: auth_model name:", auth_model.get('name'))
           
           if 'auth_state' in auth_model:
-              log.info("DEBUG: auth_state keys: " + str(auth_model['auth_state'].keys()))
-              if 'user' in auth_model['auth_state']:
-                  log.info("DEBUG: user keys: " + str(auth_model['auth_state']['user'].keys()))
-                  if 'groups' in auth_model['auth_state']['user']:
-                      log.info("DEBUG: GROUPS FOUND IN USER: " + str(auth_model['auth_state']['user']['groups']))
-              if 'id_token' in auth_model['auth_state']:
-                  log.info("DEBUG: id_token keys: " + str(auth_model['auth_state']['id_token'].keys()))
-          log.info("=" * 80)
+              auth_state = auth_model['auth_state']
+              print("DEBUG: auth_state type:", type(auth_state))
+              if isinstance(auth_state, dict):
+                  print("DEBUG: auth_state keys:", list(auth_state.keys()))
+                  
+                  # Check for groups in 'user' key
+                  user_info = auth_state.get('user')
+                  if isinstance(user_info, dict):
+                      print("DEBUG: user keys:", list(user_info.keys()))
+                      if 'groups' in user_info:
+                          print("DEBUG: GROUPS IN USER:", user_info['groups'])
+                  
+                  # Check for groups in 'id_token' key  
+                  id_token = auth_state.get('id_token')
+                  if isinstance(id_token, dict):
+                      print("DEBUG: id_token keys:", list(id_token.keys()))
+                      if 'groups' in id_token:
+                          print("DEBUG: GROUPS IN ID_TOKEN:", id_token['groups'])
+          print("=" * 80)
           return auth_model
       
       c.Authenticator.post_auth_hook = debug_user_info
