@@ -138,17 +138,30 @@ hub:
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       
-      # Custom function to extract groups from id_token
+      # Custom function to extract groups from id_token with debug
       def get_groups_from_id_token(auth_state):
           """Extract groups from Azure AD id_token"""
+          print("=" * 80)
+          print("DEBUG get_groups_from_id_token called")
+          print("DEBUG auth_state keys:", list(auth_state.keys()) if auth_state else None)
           if auth_state and 'id_token' in auth_state:
               id_token = auth_state['id_token']
-              if isinstance(id_token, dict) and 'groups' in id_token:
-                  return id_token['groups']
+              print("DEBUG id_token type:", type(id_token))
+              if isinstance(id_token, dict):
+                  print("DEBUG id_token keys:", list(id_token.keys()))
+                  if 'groups' in id_token:
+                      print("DEBUG FOUND GROUPS:", id_token['groups'])
+                      return id_token['groups']
+          print("DEBUG: No groups found, returning empty list")
+          print("=" * 80)
           return []
       
       # Set auth_state_groups_key to our custom function
       c.AzureAdOAuthenticator.auth_state_groups_key = get_groups_from_id_token
+      
+      # TEMPORARY: Also allow all users so you can at least login
+      c.Authenticator.allow_all = True
+      c.Authenticator.admin_users = {"cjapi, ermir"}
       
       # Your actual group memberships:
       # - 4fb32c31-b135-43d5-a00e-9e566e6aceff
