@@ -115,10 +115,33 @@ hub:
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       
-      # Fetch groups from Microsoft Graph API instead of token
-      c.AzureAdOAuthenticator.populate_groups_from_auth = True
+      # Custom method to fetch groups from Microsoft Graph API
+      from oauthenticator.azuread import AzureAdOAuthenticator
+      import aiohttp
       
-      # Define which groups can access JupyterHub
+      async def fetch_user_groups(self, user_data, access_token):
+          """Fetch user's groups from Microsoft Graph API"""
+          headers = {
+              "Authorization": f"Bearer {access_token}",
+              "Content-Type": "application/json"
+          }
+          url = "https://graph.microsoft.com/v1.0/me/memberOf"
+          
+          async with aiohttp.ClientSession() as session:
+              async with session.get(url, headers=headers) as resp:
+                  if resp.status == 200:
+                      data = await resp.json()
+                      # Extract group IDs
+                      groups = [group['id'] for group in data.get('value', []) if group.get('@odata.type') == '#microsoft.graph.group']
+                      self.log.info(f"Fetched {len(groups)} groups for user: {groups}")
+                      return groups
+                  else:
+                      self.log.error(f"Failed to fetch groups: {resp.status}")
+                      return []
+      
+      AzureAdOAuthenticator.fetch_user_groups = fetch_user_groups
+      
+      # Define which groups can access JupyterHub  
       c.AzureAdOAuthenticator.allowed_groups = {
           "6543851f-fd97-40e8-b097-ab5a71e44ef2",  # JupyterHub-Users
           "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
