@@ -16,6 +16,12 @@ hub:
     type: ClusterIP
   db:
     type: sqlite-pvc  # Simple SQLite database
+  
+  # Install newer oauthenticator before hub starts
+  image:
+    name: quay.io/jupyterhub/k8s-hub
+    tag: "3.2.1"  # Use recent version with oauthenticator 16+
+  
   config:
     JupyterHub:
       admin_access: true
@@ -49,14 +55,6 @@ hub:
 
   extraConfig:
     # ============================================
-    # UPGRADE OAUTHENTICATOR (for group support)
-    # ============================================
-    00-upgrade-oauthenticator: |
-      import subprocess
-      import sys
-      subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--upgrade', 'oauthenticator>=16.0.0'])
-    
-    # ============================================
     # AZURE AD / ENTRA ID AUTHENTICATION
     # ============================================
     # Credentials are loaded from Kubernetes secret (see extraEnv above).
@@ -70,7 +68,7 @@ hub:
     # 2. Re-run: ./create-azure-secret.sh
     # 3. Restart hub: kubectl rollout restart deployment hub -n jupyterhub-test
     # ============================================
-    01-azure-ad-auth: |
+    00-azure-ad-auth: |
       import os
       from oauthenticator.azuread import AzureAdOAuthenticator
       c.JupyterHub.authenticator_class = AzureAdOAuthenticator
