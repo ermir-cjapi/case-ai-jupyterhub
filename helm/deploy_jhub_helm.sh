@@ -5,7 +5,7 @@ set -euo pipefail
 NAMESPACE="${NAMESPACE:-jupyterhub-test}"
 RELEASE_NAME="${RELEASE_NAME:-jhub-v1}"
 VALUES_FILE="${VALUES_FILE:-helm/values-helm.yaml}"
-CHART_VERSION="${CHART_VERSION:-3.3.8}"
+CHART_VERSION="${CHART_VERSION:-4.0.0}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
