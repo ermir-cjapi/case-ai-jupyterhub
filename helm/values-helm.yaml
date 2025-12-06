@@ -127,39 +127,34 @@ hub:
       # MUST enable auth_state for group management to work
       c.Authenticator.enable_auth_state = True
       
+      # ============================================
+      # FINAL SOLUTION: Azure AD Group Authorization
+      # ============================================
+      # Azure AD includes groups in the id_token claims
+      # We use claim_groups_key (not auth_state_groups_key) to read from the token
+      # ============================================
+      
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       
-      # CRITICAL: Override the default auth_state_groups_key
-      # oauthenticator v17 sets a default of "user.groups" which doesn't work for Azure AD
-      # Set it to empty string to disable auth_state group checking
-      # Groups are already populated in auth_model['groups'] by manage_groups=True
-      c.AzureAdOAuthenticator.auth_state_groups_key = ""
+      # Tell oauthenticator to read groups from id_token claims (not auth_state)
+      # This is where Azure AD puts the groups
+      c.AzureAdOAuthenticator.claim_groups_key = "groups"
       
-      # DEBUG: See what groups we have
-      async def debug_user_info(authenticator, handler, auth_model):
-          print("=" * 80)
-          print("DEBUG: auth_model['groups']:", auth_model.get('groups'))
-          print("DEBUG: auth_model['admin']:", auth_model.get('admin'))
-          print("=" * 80)
-          return auth_model
-      
-      c.Authenticator.post_auth_hook = debug_user_info
-      
-      # Your actual group memberships (from debug):
-      # - 4fb32c31-b135-43d5-a00e-9e566e6aceff (need to identify this group in Azure)
+      # Your actual group memberships:
+      # - 4fb32c31-b135-43d5-a00e-9e566e6aceff
       # - d6c49ed5-eefc-48c4-90d0-2026f5fe3916 (JupyterHub-Admins)
       
       # Allow users in these groups
       c.AzureAdOAuthenticator.allowed_groups = {
-          "4fb32c31-b135-43d5-a00e-9e566e6aceff",  # Your current group (check Azure AD)
-          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916",  # JupyterHub-Admins
-          "6543851f-fd97-40e8-b097-ab5a71e44ef2"   # JupyterHub-Users (if others join)
+          "4fb32c31-b135-43d5-a00e-9e566e6aceff",
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916",
+          "6543851f-fd97-40e8-b097-ab5a71e44ef2"
       }
       
       # Admin group
       c.AzureAdOAuthenticator.admin_groups = {
-          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"
       }
       
       
