@@ -130,16 +130,25 @@ hub:
       # ============================================
       # FINAL SOLUTION: Azure AD Group Authorization
       # ============================================
-      # Azure AD includes groups in the id_token claims
-      # We use claim_groups_key (not auth_state_groups_key) to read from the token
+      # Problem: oauthenticator v17 defaults to auth_state_groups_key = "user.groups"
+      # But Azure AD puts groups in auth_state['id_token']['groups']
+      # Solution: Use a callable to extract groups from the correct location
       # ============================================
       
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       
-      # Tell oauthenticator to read groups from id_token claims (not auth_state)
-      # This is where Azure AD puts the groups
-      c.AzureAdOAuthenticator.claim_groups_key = "groups"
+      # Custom function to extract groups from id_token
+      def get_groups_from_id_token(auth_state):
+          """Extract groups from Azure AD id_token"""
+          if auth_state and 'id_token' in auth_state:
+              id_token = auth_state['id_token']
+              if isinstance(id_token, dict) and 'groups' in id_token:
+                  return id_token['groups']
+          return []
+      
+      # Set auth_state_groups_key to our custom function
+      c.AzureAdOAuthenticator.auth_state_groups_key = get_groups_from_id_token
       
       # Your actual group memberships:
       # - 4fb32c31-b135-43d5-a00e-9e566e6aceff
