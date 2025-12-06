@@ -19,10 +19,6 @@ hub:
   config:
     JupyterHub:
       admin_access: true
-      
-  # Upgrade oauthenticator to support group-based authorization
-  extraPipPackages:
-    - oauthenticator>=16.0.0
   
   # ============================================
   # AZURE AD CREDENTIALS FROM KUBERNETES SECRET
@@ -53,6 +49,14 @@ hub:
 
   extraConfig:
     # ============================================
+    # UPGRADE OAUTHENTICATOR (for group support)
+    # ============================================
+    00-upgrade-oauthenticator: |
+      import subprocess
+      import sys
+      subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--upgrade', 'oauthenticator>=16.0.0'])
+    
+    # ============================================
     # AZURE AD / ENTRA ID AUTHENTICATION
     # ============================================
     # Credentials are loaded from Kubernetes secret (see extraEnv above).
@@ -66,7 +70,7 @@ hub:
     # 2. Re-run: ./create-azure-secret.sh
     # 3. Restart hub: kubectl rollout restart deployment hub -n jupyterhub-test
     # ============================================
-    00-azure-ad-auth: |
+    01-azure-ad-auth: |
       import os
       from oauthenticator.azuread import AzureAdOAuthenticator
       c.JupyterHub.authenticator_class = AzureAdOAuthenticator
