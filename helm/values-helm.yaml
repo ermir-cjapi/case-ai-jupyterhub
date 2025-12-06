@@ -138,20 +138,27 @@ hub:
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       
-      # Custom function to extract groups from id_token with debug
+      # Custom function to extract groups from id_token JWT
+      import jwt
       def get_groups_from_id_token(auth_state):
-          """Extract groups from Azure AD id_token"""
+          """Extract groups from Azure AD id_token by decoding JWT"""
           print("=" * 80)
           print("DEBUG get_groups_from_id_token called")
-          print("DEBUG auth_state keys:", list(auth_state.keys()) if auth_state else None)
           if auth_state and 'id_token' in auth_state:
-              id_token = auth_state['id_token']
-              print("DEBUG id_token type:", type(id_token))
-              if isinstance(id_token, dict):
-                  print("DEBUG id_token keys:", list(id_token.keys()))
-                  if 'groups' in id_token:
-                      print("DEBUG FOUND GROUPS:", id_token['groups'])
-                      return id_token['groups']
+              id_token_str = auth_state['id_token']
+              try:
+                  # Decode JWT without verification (we trust it came from Azure AD via HTTPS)
+                  decoded = jwt.decode(id_token_str, options={"verify_signature": False})
+                  print("DEBUG decoded id_token keys:", list(decoded.keys()))
+                  if 'groups' in decoded:
+                      groups = decoded['groups']
+                      print("DEBUG FOUND GROUPS:", groups)
+                      print("=" * 80)
+                      return groups
+                  else:
+                      print("DEBUG: 'groups' not in decoded token")
+              except Exception as e:
+                  print("DEBUG: Error decoding JWT:", str(e))
           print("DEBUG: No groups found, returning empty list")
           print("=" * 80)
           return []
