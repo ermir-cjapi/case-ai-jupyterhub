@@ -102,8 +102,8 @@ hub:
       }
       
       # Enable group management at multiple levels
-      c.AzureAdOAuthenticator.manage_groups = true
-      c.Authenticator.manage_groups = true
+      c.AzureAdOAuthenticator.manage_groups = True
+      c.Authenticator.manage_groups = True
 
       # Try to load groups from Azure AD token claims
       c.AzureAdOAuthenticator.claim_groups_key = "groups"
