@@ -101,8 +101,12 @@ hub:
           "JupyterHub-Admins"      # Admins can manage servers and access user notebooks
       }
       
-      # Allow group-based admin management
-      c.AzureAdOAuthenticator.manage_groups = True
+      # Enable group management at multiple levels
+      c.AzureAdOAuthenticator.manage_groups = true
+      c.Authenticator.manage_groups = true
+
+      # Try to load groups from Azure AD token claims
+      c.AzureAdOAuthenticator.claim_groups_key = "groups"
       
       # ============================================
       # ALTERNATIVE: Email-Based Access Control (Not Recommended)
