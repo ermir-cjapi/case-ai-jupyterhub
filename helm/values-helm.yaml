@@ -127,12 +127,15 @@ hub:
       # MUST enable auth_state for group management to work
       c.Authenticator.enable_auth_state = True
       
+      # TEMPORARY: Allow all while debugging group path
+      c.Authenticator.allow_all = True
+      
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       
       # Groups are in auth_state['user']['groups']
-      # Use dot notation to navigate the nested dict
-      c.AzureAdOAuthenticator.auth_state_groups_key = "user.groups"
+      # Try without specifying the key - let oauthenticator auto-detect
+      # c.AzureAdOAuthenticator.auth_state_groups_key = "user.groups"
       
       # Your actual group memberships (from debug):
       # - 4fb32c31-b135-43d5-a00e-9e566e6aceff (need to identify this group in Azure)
