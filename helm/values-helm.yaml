@@ -132,20 +132,22 @@ hub:
       
       # DEBUG: Custom user_info hook to see what Azure returns
       import json
+      import logging
       async def debug_user_info(authenticator, handler, auth_model):
-          c.log.info("=" * 80)
-          c.log.info("DEBUG: Full auth_model structure:")
-          c.log.info(json.dumps({k: str(v)[:200] for k, v in auth_model.items()}, indent=2))
+          log = logging.getLogger('jupyterhub')
+          log.info("=" * 80)
+          log.info("DEBUG: Full auth_model structure:")
+          log.info(json.dumps({k: str(v)[:200] for k, v in auth_model.items()}, indent=2))
           
           if 'auth_state' in auth_model:
-              c.log.info("DEBUG: auth_state keys: " + str(auth_model['auth_state'].keys()))
+              log.info("DEBUG: auth_state keys: " + str(auth_model['auth_state'].keys()))
               if 'user' in auth_model['auth_state']:
-                  c.log.info("DEBUG: user keys: " + str(auth_model['auth_state']['user'].keys()))
+                  log.info("DEBUG: user keys: " + str(auth_model['auth_state']['user'].keys()))
                   if 'groups' in auth_model['auth_state']['user']:
-                      c.log.info("DEBUG: GROUPS FOUND IN USER: " + str(auth_model['auth_state']['user']['groups']))
+                      log.info("DEBUG: GROUPS FOUND IN USER: " + str(auth_model['auth_state']['user']['groups']))
               if 'id_token' in auth_model['auth_state']:
-                  c.log.info("DEBUG: id_token keys: " + str(auth_model['auth_state']['id_token'].keys()))
-          c.log.info("=" * 80)
+                  log.info("DEBUG: id_token keys: " + str(auth_model['auth_state']['id_token'].keys()))
+          log.info("=" * 80)
           return auth_model
       
       c.Authenticator.post_auth_hook = debug_user_info
