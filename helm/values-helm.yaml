@@ -58,7 +58,9 @@ hub:
     00-upgrade-oauthenticator: |
       import subprocess
       import sys
+      print("Upgrading oauthenticator to v17+...")
       subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "oauthenticator>=17.0.0"])
+      print("oauthenticator upgrade complete!")
     
     # ============================================
     # AZURE AD / ENTRA ID AUTHENTICATION
