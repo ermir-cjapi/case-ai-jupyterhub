@@ -89,32 +89,72 @@ hub:
       c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
       
       # ============================================
-      # GROUP-BASED AUTHORIZATION
+      # STEP 1: DEBUG - INSPECT TOKEN STRUCTURE
       # ============================================
-      # IMPORTANT: In Azure Portal, you MUST edit the app manifest:
-      # Set "groupMembershipClaims": "SecurityGroup"
-      # 
-      # Group IDs (Azure AD Object IDs, not names!):
-      # - JupyterHub-Users:  6543851f-fd97-40e8-b097-ab5a71e44ef2
-      # - JupyterHub-Admins: d6c49ed5-eefc-48c4-90d0-2026f5fe3916
+      # We need to see WHERE groups are actually stored in the Azure AD token
       # ============================================
       
-      # Enable group management
-      c.AzureAdOAuthenticator.manage_groups = True
+      # Enable auth_state to persist authentication information
+      c.Authenticator.enable_auth_state = True
       
-      # Tell oauthenticator where groups are in the auth state
-      c.AzureAdOAuthenticator.auth_state_groups_key = "user.groups"
+      # Request additional scopes including Graph API access
+      c.AzureAdOAuthenticator.scope = [
+          "openid",
+          "profile", 
+          "email",
+          "offline_access",
+          "User.Read",
+          "GroupMember.Read.All"
+      ]
       
-      # Restrict access to users in these Azure AD groups (use group IDs)
-      c.AzureAdOAuthenticator.allowed_groups = {
-          "6543851f-fd97-40e8-b097-ab5a71e44ef2",  # JupyterHub-Users
-          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
-      }
+      # Temporarily allow all users so we can debug
+      c.Authenticator.allow_all = True
       
-      # Grant admin access to users in this Azure AD group (use group ID)
-      c.AzureAdOAuthenticator.admin_groups = {
-          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
-      }
+      # Post-auth hook to inspect token structure
+      import json
+      
+      async def inspect_token_structure(authenticator, handler, authentication):
+          """Debug hook to inspect where groups are in the token"""
+          username = authentication.get('name', 'unknown')
+          auth_state = authentication.get('auth_state', {})
+          
+          authenticator.log.error("="*80)
+          authenticator.log.error(f"DEBUG: Inspecting auth for user: {username}")
+          authenticator.log.error(f"DEBUG: auth_state keys: {list(auth_state.keys())}")
+          
+          # Check id_token
+          if 'id_token' in auth_state:
+              try:
+                  import jwt
+                  # Decode without verification for debugging
+                  id_claims = jwt.decode(auth_state['id_token'], options={"verify_signature": False})
+                  authenticator.log.error(f"DEBUG: id_token claims keys: {list(id_claims.keys())}")
+                  if 'groups' in id_claims:
+                      authenticator.log.error(f"DEBUG: FOUND groups in id_token: {id_claims['groups']}")
+                  if 'hasgroups' in id_claims or '_claim_names' in id_claims:
+                      authenticator.log.error(f"DEBUG: OVERAGE CLAIM DETECTED in id_token")
+              except Exception as e:
+                  authenticator.log.error(f"DEBUG: Error decoding id_token: {e}")
+          
+          # Check token_response
+          if 'token_response' in auth_state:
+              tr = auth_state['token_response']
+              authenticator.log.error(f"DEBUG: token_response keys: {list(tr.keys())}")
+          
+          # Check user
+          if 'user' in auth_state:
+              user = auth_state['user']
+              authenticator.log.error(f"DEBUG: user keys: {list(user.keys()) if isinstance(user, dict) else type(user)}")
+              if isinstance(user, dict) and 'groups' in user:
+                  authenticator.log.error(f"DEBUG: FOUND groups in user: {user['groups']}")
+          
+          authenticator.log.error("="*80)
+          
+          # Grant admin temporarily for debugging
+          authentication['admin'] = True
+          return authentication
+      
+      c.Authenticator.post_auth_hook = inspect_token_structure
       
       
       # ============================================
