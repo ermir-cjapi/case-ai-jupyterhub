@@ -105,24 +105,26 @@ hub:
       # GROUP-BASED AUTHORIZATION (oauthenticator v16+)
       # ============================================
       
-      # TEMPORARY: Allow all tenant users + explicit username
-      c.Authenticator.allow_all = True
-      c.Authenticator.allowed_users = {"cjapi, ermir"}  # Explicit allow
-      c.Authenticator.admin_users = {"cjapi, ermir"}    # Make admin directly
+      # NOTE: Group Object IDs from Azure AD:
+      # - JupyterHub-Users:  6543851f-fd97-40e8-b097-ab5a71e44ef2
+      # - JupyterHub-Admins: d6c49ed5-eefc-48c4-90d0-2026f5fe3916
+      
+      # Enable group management
+      c.AzureAdOAuthenticator.manage_groups = True
       
       # Tell oauthenticator where to find groups in Azure AD token
       c.AzureAdOAuthenticator.claim_groups_key = "groups"
       
-      # After this works, enable group-based authorization:
-      # c.AzureAdOAuthenticator.manage_groups = True
-      # c.Authenticator.manage_groups = True
-      # c.AzureAdOAuthenticator.admin_groups = [
-      #     "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
-      # ]
-      # c.AzureAdOAuthenticator.allowed_groups = [
-      #     "6543851f-fd97-40e8-b097-ab5a71e44ef2",  # JupyterHub-Users
-      #     "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
-      # ]
+      # Define which groups can access JupyterHub
+      c.AzureAdOAuthenticator.allowed_groups = [
+          "6543851f-fd97-40e8-b097-ab5a71e44ef2",  # JupyterHub-Users
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
+      ]
+      
+      # Define which groups have admin access
+      c.AzureAdOAuthenticator.admin_groups = [
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
+      ]
       
       # ============================================
       # DEBUG LOGGING - See what's happening
