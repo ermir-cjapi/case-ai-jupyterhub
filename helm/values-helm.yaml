@@ -125,6 +125,13 @@ hub:
       }
       
       # ============================================
+      # DEBUG LOGGING - See what groups Azure AD sends
+      # ============================================
+      import logging
+      logging.getLogger('oauthenticator').setLevel(logging.DEBUG)
+      c.JupyterHub.log_level = 'DEBUG'
+      
+      # ============================================
       # OPTION B: Use Group Names (requires Azure AD Premium)
       # ============================================
       # If you have Azure AD Premium, you can configure Azure AD
