@@ -94,8 +94,9 @@ hub:
       # We need to see WHERE groups are actually stored in the Azure AD token
       # ============================================
       
-      # Enable auth_state to persist authentication information
-      c.Authenticator.enable_auth_state = True
+      # NOTE: We're NOT enabling auth_state for now to avoid CryptKeeper issues
+      # We'll inspect the authentication dict directly during login
+      # c.Authenticator.enable_auth_state = True
       
       # Request additional scopes including Graph API access
       c.AzureAdOAuthenticator.scope = [
