@@ -116,7 +116,7 @@ hub:
       c.AzureAdOAuthenticator.manage_groups = True
       
       # Tell oauthenticator where to find groups in Azure AD token
-      c.AzureAdOAuthenticator.claim_groups_key = "groups"
+      c.AzureAdOAuthenticator.auth_state_groups_key = "groups"
       
       # Define which groups can access JupyterHub
       c.AzureAdOAuthenticator.allowed_groups = [
