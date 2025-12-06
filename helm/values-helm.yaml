@@ -32,9 +32,6 @@ hub:
   # This loads environment variables from the secret:
   # ============================================
   extraEnv:
-    # Cryptographic key for auth_state encryption (32 bytes hex)
-    JUPYTERHUB_CRYPT_KEY:
-      value: "2ed5854441fcd1d787df21fde8d18ead1ccd886b40cf9cbc48e2ae794e141eb4"
     AZURE_TENANT_ID:
       valueFrom:
         secretKeyRef:
@@ -78,9 +75,6 @@ hub:
       import os
       from oauthenticator.azuread import AzureAdOAuthenticator
       c.JupyterHub.authenticator_class = AzureAdOAuthenticator
-      
-      # Enable auth_state to access token claims including groups
-      c.Authenticator.enable_auth_state = True
       
       # ============================================
       # CREDENTIALS FROM KUBERNETES SECRET
