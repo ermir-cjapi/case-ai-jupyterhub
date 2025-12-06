@@ -32,6 +32,9 @@ hub:
   # This loads environment variables from the secret:
   # ============================================
   extraEnv:
+    # Crypt key for auth_state encryption (required for group management)
+    JUPYTERHUB_CRYPT_KEY:
+      value: "2ed5854441fcd1d787df21fde8d18ead1ccd886b40cf9cbc48e2ae794e141eb4"
     AZURE_TENANT_ID:
       valueFrom:
         secretKeyRef:
@@ -101,12 +104,15 @@ hub:
       # Format: List of group Object IDs (GUIDs)
       # ============================================
       
+      # MUST enable auth_state for group management to work
+      c.Authenticator.enable_auth_state = True
+      
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       
-      # Groups are in the 'user' dict (NOT 'user.groups' - that's a path notation)
-      # The actual location is: auth_state['user']['groups']
-      c.AzureAdOAuthenticator.auth_state_groups_key = "user"  # Look in the user dict for groups
+      # Groups are in auth_state['user']['groups']
+      # Use dot notation to navigate the nested dict
+      c.AzureAdOAuthenticator.auth_state_groups_key = "user.groups"
       
       # Your actual group memberships (from debug):
       # - 4fb32c31-b135-43d5-a00e-9e566e6aceff (need to identify this group in Azure)
