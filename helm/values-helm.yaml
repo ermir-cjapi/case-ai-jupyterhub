@@ -130,24 +130,32 @@ hub:
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       
-      # Post-auth hook to move groups from auth_state['user']['groups'] to auth_state['groups']
-      # This is required because oauthenticator v17 only looks at top-level keys in auth_state
-      async def move_groups_to_top_level(authenticator, handler, auth_model):
-          auth_state = auth_model.get('auth_state', {})
-          user_info = auth_state.get('user', {})
-          groups = user_info.get('groups', [])
+      # DEBUG: Custom user_info hook to see what Azure returns
+      import json
+      async def debug_user_info(authenticator, handler, auth_model):
+          c.log.info("=" * 80)
+          c.log.info("DEBUG: Full auth_model structure:")
+          c.log.info(json.dumps({k: str(v)[:200] for k, v in auth_model.items()}, indent=2))
           
-          # Place groups at the top level of auth_state
-          auth_state['groups'] = groups
-          auth_model['auth_state'] = auth_state
-          
-          authenticator.log.info(f"Post-auth hook: Moved {len(groups)} groups to top-level: {groups}")
+          if 'auth_state' in auth_model:
+              c.log.info("DEBUG: auth_state keys: " + str(auth_model['auth_state'].keys()))
+              if 'user' in auth_model['auth_state']:
+                  c.log.info("DEBUG: user keys: " + str(auth_model['auth_state']['user'].keys()))
+                  if 'groups' in auth_model['auth_state']['user']:
+                      c.log.info("DEBUG: GROUPS FOUND IN USER: " + str(auth_model['auth_state']['user']['groups']))
+              if 'id_token' in auth_model['auth_state']:
+                  c.log.info("DEBUG: id_token keys: " + str(auth_model['auth_state']['id_token'].keys()))
+          c.log.info("=" * 80)
           return auth_model
       
-      c.Authenticator.post_auth_hook = move_groups_to_top_level
+      c.Authenticator.post_auth_hook = debug_user_info
       
-      # Now tell oauthenticator where to find groups (at top-level after our hook)
-      c.AzureAdOAuthenticator.auth_state_groups_key = "groups"
+      # DON'T set auth_state_groups_key or claim_groups_key yet - let's see what we have first
+      # c.AzureAdOAuthenticator.claim_groups_key = "groups"
+      # c.AzureAdOAuthenticator.auth_state_groups_key = "groups"
+      
+      # TEMPORARY: Allow all users so we can test the debug output
+      c.Authenticator.allow_all = True
       
       # Your actual group memberships (from debug):
       # - 4fb32c31-b135-43d5-a00e-9e566e6aceff (need to identify this group in Azure)
