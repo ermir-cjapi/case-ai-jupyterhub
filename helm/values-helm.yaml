@@ -20,6 +20,11 @@ hub:
   config:
     JupyterHub:
       admin_access: true
+    CryptKeeper:
+      # Generate a secure key for auth_state encryption
+      # openssl rand -hex 32
+      keys:
+        - "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2"
   
   # ============================================
   # AZURE AD CREDENTIALS FROM KUBERNETES SECRET
@@ -75,6 +80,9 @@ hub:
       import os
       from oauthenticator.azuread import AzureAdOAuthenticator
       c.JupyterHub.authenticator_class = AzureAdOAuthenticator
+      
+      # Enable auth_state to access token claims including groups
+      c.Authenticator.enable_auth_state = True
       
       # ============================================
       # CREDENTIALS FROM KUBERNETES SECRET
@@ -135,6 +143,20 @@ hub:
       import logging
       logging.getLogger('oauthenticator').setLevel(logging.DEBUG)
       c.JupyterHub.log_level = 'DEBUG'
+      
+      # Debug: Print the entire auth_model to see where groups are
+      async def debug_auth_model(authenticator, handler, data):
+          auth_model = await authenticator.authenticate(handler, data)
+          if auth_model:
+              c.JupyterHub.log.error(f"DEBUG auth_model keys: {auth_model.keys()}")
+              if 'auth_state' in auth_model:
+                  c.JupyterHub.log.error(f"DEBUG auth_state keys: {auth_model['auth_state'].keys()}")
+                  c.JupyterHub.log.error(f"DEBUG auth_state content: {auth_model['auth_state']}")
+          return auth_model
+      
+      # Temporarily override authenticate to debug
+      original_authenticate = c.AzureAdOAuthenticator.authenticate
+      c.AzureAdOAuthenticator.authenticate = debug_auth_model
       
       # ============================================
       # OPTION B: Use Group Names (requires Azure AD Premium)
