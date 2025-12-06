@@ -134,6 +134,8 @@ hub:
       
       ADMIN_GROUP = "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"  # JupyterHub-Admins
       
+      # Must allow_all for post_auth_hook to run
+      c.Authenticator.allow_all = True
       c.AzureAdOAuthenticator.manage_groups = False
       
       # Post-authentication hook to fetch groups and set admin status
