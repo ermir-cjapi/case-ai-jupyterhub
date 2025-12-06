@@ -82,31 +82,62 @@ hub:
       # ============================================
       # GROUP-BASED ACCESS CONTROL (RECOMMENDED)
       # ============================================
-      # Create these groups in Azure AD:
-      # 1. JupyterHub-Users (Security group) - Regular users
-      # 2. JupyterHub-Admins (Security group) - Administrators
+      # Azure AD sends group Object IDs (GUIDs), NOT group names!
       #
-      # To add users: Azure AD → Groups → [Group Name] → Members → Add members
-      # Changes take effect on next user login (no JupyterHub redeploy needed!)
+      # To get your group Object IDs:
+      # 1. Azure Portal → Microsoft Entra ID → Groups
+      # 2. Click on "JupyterHub-Users" → Properties → Copy "Object ID"
+      # 3. Click on "JupyterHub-Admins" → Properties → Copy "Object ID"
+      # 4. Replace the example UUIDs below with your actual Object IDs
+      #
+      # Also configure Azure AD app to include groups in token:
+      # Azure Portal → App registrations → JupyterHub → Token configuration
+      # → Add groups claim → Select "Security groups"
       # ============================================
       
-      # Users in these Azure AD groups can access JupyterHub
-      c.AzureAdOAuthenticator.allowed_groups = {
-          "JupyterHub-Users",      # Regular users with standard access
-          "JupyterHub-Admins"      # Admins need access too!
-      }
-      
-      # Users in this Azure AD group will have admin privileges
-      c.AzureAdOAuthenticator.admin_groups = {
-          "JupyterHub-Admins"      # Admins can manage servers and access user notebooks
-      }
-      
-      # Enable group management at multiple levels
+      # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       c.Authenticator.manage_groups = True
-
-      # Try to load groups from Azure AD token claims
+      
+      # Tell JupyterHub where to find groups in the token
       c.AzureAdOAuthenticator.claim_groups_key = "groups"
+      
+      # ============================================
+      # OPTION A: Use Group Object IDs (GUIDs) - RECOMMENDED
+      # ============================================
+      # Replace these with YOUR actual group Object IDs from Azure AD!
+      # Get them from: Azure AD → Groups → [Group] → Properties → Object ID
+      
+      # Example Object IDs (REPLACE WITH YOUR ACTUAL IDs!):
+      # JUPYTERHUB_USERS_GROUP_ID = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+      # JUPYTERHUB_ADMINS_GROUP_ID = "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy"
+      
+      c.AzureAdOAuthenticator.allowed_groups = {
+          # Replace with your JupyterHub-Users Object ID
+          "6543851f-fd97-40e8-b097-ab5a71e44ef2",
+          # Replace with your JupyterHub-Admins Object ID  
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"
+      }
+      
+      c.AzureAdOAuthenticator.admin_groups = {
+          # Replace with your JupyterHub-Admins Object ID
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"
+      }
+      
+      # ============================================
+      # OPTION B: Use Group Names (requires Azure AD Premium)
+      # ============================================
+      # If you have Azure AD Premium, you can configure Azure AD
+      # to send group names instead of IDs. Uncomment below:
+      #
+      # c.AzureAdOAuthenticator.allowed_groups = {
+      #     "JupyterHub-Users",
+      #     "JupyterHub-Admins"
+      # }
+      # c.AzureAdOAuthenticator.admin_groups = {
+      #     "JupyterHub-Admins"
+      # }
+      
       
       # ============================================
       # ALTERNATIVE: Email-Based Access Control (Not Recommended)
