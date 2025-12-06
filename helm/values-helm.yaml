@@ -19,6 +19,10 @@ hub:
   config:
     JupyterHub:
       admin_access: true
+      
+  # Upgrade oauthenticator to support group-based authorization
+  extraPipPackages:
+    - oauthenticator>=16.0.0
   
   # ============================================
   # AZURE AD CREDENTIALS FROM KUBERNETES SECRET
@@ -95,37 +99,31 @@ hub:
       # → Add groups claim → Select "Security groups"
       # ============================================
       
+      # ============================================
+      # GROUP-BASED AUTHORIZATION (oauthenticator v16+)
+      # ============================================
+      # This will work after oauthenticator upgrades (via extraPipPackages above)
+      
+      # Allow users in these Azure AD groups to access JupyterHub
+      c.AzureAdOAuthenticator.allowed_groups = [
+          "6543851f-fd97-40e8-b097-ab5a71e44ef2",  # JupyterHub-Users
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
+      ]
+      
+      # Grant admin privileges to users in this Azure AD group
+      c.AzureAdOAuthenticator.admin_groups = [
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
+      ]
+      
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       c.Authenticator.manage_groups = True
       
-      # Tell JupyterHub where to find groups in the token
+      # Tell oauthenticator where to find groups in Azure AD token
       c.AzureAdOAuthenticator.claim_groups_key = "groups"
       
       # ============================================
-      # OPTION A: Use Group Object IDs (GUIDs) - RECOMMENDED
-      # ============================================
-      # Replace these with YOUR actual group Object IDs from Azure AD!
-      # Get them from: Azure AD → Groups → [Group] → Properties → Object ID
-      
-      # Example Object IDs (REPLACE WITH YOUR ACTUAL IDs!):
-      # JUPYTERHUB_USERS_GROUP_ID = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-      # JUPYTERHUB_ADMINS_GROUP_ID = "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy"
-      
-      c.AzureAdOAuthenticator.allowed_groups = {
-          # Replace with your JupyterHub-Users Object ID
-          "6543851f-fd97-40e8-b097-ab5a71e44ef2",
-          # Replace with your JupyterHub-Admins Object ID  
-          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"
-      }
-      
-      c.AzureAdOAuthenticator.admin_groups = {
-          # Replace with your JupyterHub-Admins Object ID
-          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"
-      }
-      
-      # ============================================
-      # DEBUG LOGGING - See what groups Azure AD sends
+      # DEBUG LOGGING - See what's happening
       # ============================================
       import logging
       logging.getLogger('oauthenticator').setLevel(logging.DEBUG)
