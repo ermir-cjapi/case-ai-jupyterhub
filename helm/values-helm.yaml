@@ -20,46 +20,63 @@ hub:
     JupyterHub:
       admin_access: true
   
+  # ============================================
+  # AZURE AD CREDENTIALS FROM KUBERNETES SECRET
+  # ============================================
+  # Credentials are stored securely in Kubernetes secret.
+  # 
+  # To create the secret, run on your NVIDIA server:
+  #   cd helm && ./create-azure-secret.sh
+  #
+  # This loads environment variables from the secret:
+  # ============================================
+  extraEnv:
+    AZURE_TENANT_ID:
+      valueFrom:
+        secretKeyRef:
+          name: jupyterhub-azure-oauth
+          key: tenant-id
+    AZURE_CLIENT_ID:
+      valueFrom:
+        secretKeyRef:
+          name: jupyterhub-azure-oauth
+          key: client-id
+    AZURE_CLIENT_SECRET:
+      valueFrom:
+        secretKeyRef:
+          name: jupyterhub-azure-oauth
+          key: client-secret
+
   extraConfig:
     # ============================================
     # AZURE AD / ENTRA ID AUTHENTICATION
     # ============================================
-    # Setup Instructions:
-    # 1. Go to Azure Portal → Microsoft Entra ID → App registrations
-    # 2. Click "New registration"
-    # 3. Fill in:
-    #    - Name: JupyterHub Production
-    #    - Supported account types: Single tenant (Accounts in this organizational directory only)
-    #    - Redirect URI: Web → https://jupyterhub.ccrolabs.com/hub/oauth_callback
-    # 4. After creation, go to "Overview" and copy:
-    #    - Application (client) ID → CLIENT_ID below
-    #    - Directory (tenant) ID → TENANT_ID below
-    # 5. Go to "Certificates & secrets" → New client secret → Copy secret value → CLIENT_SECRET below
-    # 6. Go to "API permissions":
-    #    - Add permission → Microsoft Graph → Delegated permissions
-    #    - Add: email, openid, profile, User.Read
-    #    - (For group-based access): Also add GroupMember.Read.All
-    #    - Click "Grant admin consent" button
-    # 7. Update the values below with your credentials
+    # Credentials are loaded from Kubernetes secret (see extraEnv above).
+    #
+    # First-time setup:
+    # 1. Create the secret: cd helm && ./create-azure-secret.sh
+    # 2. Deploy JupyterHub: ./deploy_jhub_helm.sh
+    #
+    # To update credentials:
+    # 1. Delete old secret: kubectl delete secret jupyterhub-azure-oauth -n jupyterhub-test
+    # 2. Re-run: ./create-azure-secret.sh
+    # 3. Restart hub: kubectl rollout restart deployment hub -n jupyterhub-test
     # ============================================
     00-azure-ad-auth: |
+      import os
       from oauthenticator.azuread import AzureAdOAuthenticator
       c.JupyterHub.authenticator_class = AzureAdOAuthenticator
       
       # ============================================
-      # PASTE YOUR CREDENTIALS HERE (from app registration):
+      # CREDENTIALS FROM KUBERNETES SECRET
       # ============================================
-      # After creating your app registration, replace these values:
-      # - Get Tenant ID and Client ID from: App Registration → Overview
-      # - Get Client Secret from: App Registration → Certificates & secrets
-      # 
-      # ⚠️ SECURITY: For production, use Kubernetes secrets instead of plaintext!
-      # See: AZURE-AD-AUTH-QUICK-REFERENCE.md (Template 5)
+      # These are loaded from environment variables (set via extraEnv above)
+      # The actual values are stored in Kubernetes secret: jupyterhub-azure-oauth
       # ============================================
       
-      c.AzureAdOAuthenticator.tenant_id = "b73221da-cbb5-4c98-9434-b0665273141a"
-      c.AzureAdOAuthenticator.client_id = "9144a933-3898-411a-b358-e7288a89bcde"
-      c.AzureAdOAuthenticator.client_secret = "c77adb97-b987-43d1-904b-8193aa7f9223"
+      c.AzureAdOAuthenticator.tenant_id = os.environ.get('AZURE_TENANT_ID')
+      c.AzureAdOAuthenticator.client_id = os.environ.get('AZURE_CLIENT_ID')
+      c.AzureAdOAuthenticator.client_secret = os.environ.get('AZURE_CLIENT_SECRET')
       c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
       
       # ============================================

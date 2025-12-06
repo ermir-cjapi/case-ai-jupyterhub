@@ -1,0 +1,48 @@
+# =============================================================================
+# SECRETS - NEVER COMMIT THESE!
+# =============================================================================
+# Azure AD secrets
+*secret*.txt
+*secret*.env
+*.secrets
+azure-credentials*
+.env.local
+.env.production
+
+# Kubernetes secret files
+*-secret.yaml
+*-secrets.yaml
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+.venv/
+
+# Node (if any)
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Local testing data
+local-testing/data/
+
