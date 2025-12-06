@@ -130,6 +130,10 @@ hub:
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       
+      # CRITICAL: Disable auth_state_groups_key since groups are already in auth_model['groups']
+      # oauthenticator sets a default value of "user.groups" which doesn't exist for Azure AD
+      c.AzureAdOAuthenticator.auth_state_groups_key = None
+      
       # DEBUG: See what groups we have
       async def debug_user_info(authenticator, handler, auth_model):
           print("=" * 80)
