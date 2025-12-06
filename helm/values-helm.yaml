@@ -130,42 +130,15 @@ hub:
       # Enable group management
       c.AzureAdOAuthenticator.manage_groups = True
       
-      # DEBUG: Custom user_info hook to see what Azure returns
+      # DEBUG: See what groups we have
       async def debug_user_info(authenticator, handler, auth_model):
           print("=" * 80)
-          print("DEBUG: auth_model keys:", list(auth_model.keys()))
-          print("DEBUG: auth_model name:", auth_model.get('name'))
-          
-          if 'auth_state' in auth_model:
-              auth_state = auth_model['auth_state']
-              print("DEBUG: auth_state type:", type(auth_state))
-              if isinstance(auth_state, dict):
-                  print("DEBUG: auth_state keys:", list(auth_state.keys()))
-                  
-                  # Check for groups in 'user' key
-                  user_info = auth_state.get('user')
-                  if isinstance(user_info, dict):
-                      print("DEBUG: user keys:", list(user_info.keys()))
-                      if 'groups' in user_info:
-                          print("DEBUG: GROUPS IN USER:", user_info['groups'])
-                  
-                  # Check for groups in 'id_token' key  
-                  id_token = auth_state.get('id_token')
-                  if isinstance(id_token, dict):
-                      print("DEBUG: id_token keys:", list(id_token.keys()))
-                      if 'groups' in id_token:
-                          print("DEBUG: GROUPS IN ID_TOKEN:", id_token['groups'])
+          print("DEBUG: auth_model['groups']:", auth_model.get('groups'))
+          print("DEBUG: auth_model['admin']:", auth_model.get('admin'))
           print("=" * 80)
           return auth_model
       
       c.Authenticator.post_auth_hook = debug_user_info
-      
-      # DON'T set auth_state_groups_key or claim_groups_key yet - let's see what we have first
-      # c.AzureAdOAuthenticator.claim_groups_key = "groups"
-      # c.AzureAdOAuthenticator.auth_state_groups_key = "groups"
-      
-      # TEMPORARY: Allow all users so we can test the debug output
-      c.Authenticator.allow_all = True
       
       # Your actual group memberships (from debug):
       # - 4fb32c31-b135-43d5-a00e-9e566e6aceff (need to identify this group in Azure)
