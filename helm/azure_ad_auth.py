@@ -36,6 +36,9 @@ async def fetch_user_groups_from_graph_api(access_token):
     API Reference:
         https://learn.microsoft.com/en-us/graph/api/user-list-memberof
     """
+    print("🚨 DEBUG: fetch_user_groups_from_graph_api() ENTERED")
+    print(f"🚨 DEBUG: access_token type: {type(access_token)}")
+    print(f"🚨 DEBUG: access_token value: {access_token[:50] if access_token else 'None'}...")
     print("=" * 80)
     print("🔍 FETCHING USER GROUPS FROM MICROSOFT GRAPH API")
     print("=" * 80)
