@@ -245,7 +245,9 @@ class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
         print(f"✅ Access token found (length: {len(access_token)} chars)")
         
         # Fetch groups from Microsoft Graph API
+        print(f"📞 Calling fetch_user_groups_from_graph_api()...")
         user_groups = await fetch_user_groups_from_graph_api(access_token)
+        print(f"📞 fetch_user_groups_from_graph_api() returned: {user_groups}")
         
         # Add groups to auth_model
         auth_model['groups'] = user_groups
