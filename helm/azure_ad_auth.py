@@ -186,16 +186,36 @@ class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
         """
     )
     
-    async def update_auth_model(self, auth_model):
+    async def authenticate(self, handler, data=None):
         """
-        Called after authentication to enrich user info with groups.
+        Override authenticate to fetch groups after Azure AD login.
         
-        This is where we fetch groups from Microsoft Graph API and
-        add them to the auth_model so JupyterHub can use them for
-        authorization decisions.
+        This is called on every login attempt.
         """
         print("=" * 80)
-        print("🔐 POST-AUTHENTICATION: update_auth_model called")
+        print("🔐 AUTHENTICATE: Custom authenticate method called")
+        print("=" * 80)
+        
+        # Call parent's authenticate method first
+        auth_model = await super().authenticate(handler, data)
+        
+        if not auth_model:
+            print("❌ Authentication failed at parent level")
+            print("=" * 80)
+            return None
+        
+        print(f"✅ Parent authentication succeeded")
+        print(f"📦 auth_model keys: {list(auth_model.keys())}")
+        
+        # Now do our custom group fetching
+        return await self._fetch_and_add_groups(auth_model)
+    
+    async def _fetch_and_add_groups(self, auth_model):
+        """
+        Helper method to fetch groups and add to auth_model.
+        """
+        print("=" * 80)
+        print("🔍 FETCHING GROUPS: _fetch_and_add_groups called")
         print("=" * 80)
         
         # Call parent class method first
@@ -203,18 +223,26 @@ class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
         
         username = auth_model.get('name', 'Unknown')
         print(f"👤 User: {username}")
-        print(f"📧 Email: {auth_model.get('auth_state', {}).get('user', {}).get('email', 'Unknown')}")
         
         # Get access_token from auth_state
         auth_state = auth_model.get('auth_state', {})
-        access_token = auth_state.get('access_token')
+        if not auth_state:
+            print("❌ WARNING: No auth_state in auth_model!")
+            print(f"   Available auth_model keys: {list(auth_model.keys())}")
+            print("=" * 80)
+            return auth_model
         
+        print(f"📧 Email: {auth_state.get('user', {}).get('email', 'Unknown')}")
+        
+        access_token = auth_state.get('access_token')
         if not access_token:
             print("❌ WARNING: No access_token in auth_state!")
             print(f"   Available auth_state keys: {list(auth_state.keys())}")
             print("   Cannot fetch groups without access_token")
             print("=" * 80)
             return auth_model
+        
+        print(f"✅ Access token found (length: {len(access_token)} chars)")
         
         # Fetch groups from Microsoft Graph API
         user_groups = await fetch_user_groups_from_graph_api(access_token)
@@ -226,7 +254,7 @@ class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
         
         # Check group-based authorization
         if self.allowed_groups:
-            print(f"🔒 Checking allowed_groups: {self.allowed_groups}")
+            print(f"🔒 Checking allowed_groups: {len(self.allowed_groups)} configured")
             if not any(group in self.allowed_groups for group in user_groups):
                 print(f"❌ User {username} not in any allowed groups!")
                 print(f"   User groups: {user_groups}")
@@ -242,7 +270,8 @@ class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
             auth_model['admin'] = is_admin
             print(f"👑 Admin status: {is_admin}")
             if is_admin:
-                print(f"   User is in admin group(s): {self.admin_groups & set(user_groups)}")
+                matching_groups = self.admin_groups & set(user_groups)
+                print(f"   User is in admin group(s): {matching_groups}")
         
         print("=" * 80)
         return auth_model
