@@ -20,140 +20,236 @@ from oauthenticator.azuread import AzureAdOAuthenticator
 from traitlets import Set
 
 
+def get_graph_access_token_on_behalf_of(user_access_token: str) -> str:
+    """
+    Exchange the JupyterHub access_token for a Microsoft Graph token
+    using the OAuth2 On-Behalf-Of (OBO) flow.
+
+    This keeps us in the 'delegated' model (Option A):
+    - User signs in once to JupyterHub
+    - Our app calls Graph *on behalf of* that user
+
+    Docs:
+    - https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-on-behalf-of-flow
+    """
+    print("================================================================================")
+    print("🔁 OBO FLOW: Exchanging access_token for Microsoft Graph token...")
+
+    tenant_id = os.environ.get("AZURE_TENANT_ID")
+    client_id = os.environ.get("AZURE_CLIENT_ID")
+    client_secret = os.environ.get("AZURE_CLIENT_SECRET")
+
+    if not (tenant_id and client_id and client_secret):
+        print("❌ OBO ERROR: Missing AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET env vars")
+        print("   Cannot perform On-Behalf-Of flow without these values")
+        print("================================================================================")
+        return ""
+
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+
+    data = {
+        # OBO grant type
+        "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        "requested_token_use": "on_behalf_of",
+        # Our app
+        "client_id": client_id,
+        "client_secret": client_secret,
+        # Incoming user token (for JupyterHub app)
+        "assertion": user_access_token,
+        # Ask for Graph scopes; .default uses what you configured on the app
+        "scope": "https://graph.microsoft.com/.default",
+    }
+
+    print(f"🌐 OBO token_url: {token_url}")
+
+    try:
+        resp = requests.post(token_url, data=data, timeout=10)
+        print(f"📥 OBO response status: {resp.status_code}")
+
+        if resp.status_code != 200:
+            print("❌ OBO ERROR: Failed to obtain Graph access token")
+            print(f"📄 Response body: {resp.text[:500]}")
+            print("   HINTS:")
+            print("   - Ensure your app registration has Microsoft Graph delegated permissions")
+            print("     like 'User.Read' and 'GroupMember.Read.All'")
+            print("   - Click 'Grant admin consent' in Azure Portal")
+            print("   - Ensure you're using the v2.0 token endpoint")
+            print("================================================================================")
+            return ""
+
+        token_data = resp.json()
+        graph_token = token_data.get("access_token", "")
+        if not graph_token:
+            print("❌ OBO ERROR: No 'access_token' field in response JSON")
+            print(f"   Keys: {list(token_data.keys())}")
+            print("================================================================================")
+            return ""
+
+        print("✅ OBO SUCCESS: Obtained Microsoft Graph access token")
+        print("================================================================================")
+        return graph_token
+
+    except requests.exceptions.RequestException as e:
+        print(f"❌ OBO NETWORK ERROR: {e}")
+        print("   Could not contact Azure AD token endpoint for OBO flow")
+        print("================================================================================")
+        return ""
+    except Exception as e:
+        print(f"❌ OBO UNEXPECTED EXCEPTION: {type(e).__name__}: {e}")
+        import traceback
+
+        print(traceback.format_exc())
+        print("================================================================================")
+        return ""
+
+
 async def fetch_user_groups_from_graph_api(access_token):
     """
     Fetch user's Azure AD group memberships via Microsoft Graph API.
-    
+
     This is necessary because Azure AD Free tier does NOT include
     groups in the OAuth token. We must fetch them separately.
-    
+
     Args:
-        access_token (str): OAuth access token from Azure AD
-    
+        access_token (str): OAuth access token issued for the JupyterHub app
+                            (we will exchange it for a Graph token via OBO).
+
     Returns:
         list: List of group Object IDs (UUIDs) the user belongs to
-    
+
     API Reference:
         https://learn.microsoft.com/en-us/graph/api/user-list-memberof
     """
     print("🚨 DEBUG: fetch_user_groups_from_graph_api() ENTERED")
     print(f"🚨 DEBUG: access_token type: {type(access_token)}")
     print(f"🚨 DEBUG: access_token value: {access_token[:50] if access_token else 'None'}...")
-    print("=" * 80)
+    print("================================================================================")
     print("🔍 FETCHING USER GROUPS FROM MICROSOFT GRAPH API")
-    print("=" * 80)
-    
+    print("================================================================================")
+
     if not access_token:
         print("❌ ERROR: No access_token provided")
-        print("=" * 80)
+        print("================================================================================")
         return []
-    
+
     print(f"✅ Access token present (length: {len(access_token)} chars)")
-    
-    # Microsoft Graph API endpoint to get user's group memberships
+
+    # ------------------------------------------------------------------
+    # STEP 1: Exchange hub token for a Microsoft Graph token (OBO)
+    # ------------------------------------------------------------------
+    graph_token = get_graph_access_token_on_behalf_of(access_token)
+    if not graph_token:
+        print("❌ ERROR: Could not obtain Microsoft Graph access token via OBO flow")
+        print("   Cannot query /me/memberOf without a valid Graph token")
+        print("================================================================================")
+        return []
+
+    # ------------------------------------------------------------------
+    # STEP 2: Call Microsoft Graph with the GRAPH token
+    # ------------------------------------------------------------------
     graph_api_url = "https://graph.microsoft.com/v1.0/me/memberOf"
-    
+
     headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {graph_token}",
+        "Content-Type": "application/json",
     }
-    
+
     print(f"📡 Making API request to: {graph_api_url}")
-    print(f"📋 Request headers: Authorization: Bearer <token>, Content-Type: application/json")
-    
+    print("📋 Request headers: Authorization: Bearer <graph_token>, Content-Type: application/json")
+
     try:
         # Make synchronous request (we're in async context but requests is sync)
-        # In production, consider using aiohttp for true async
         response = requests.get(graph_api_url, headers=headers, timeout=10)
-        
+
         print(f"📥 Response status code: {response.status_code}")
-        
+
         if response.status_code == 200:
             data = response.json()
-            print(f"✅ API call successful!")
+            print("✅ API call successful!")
             print(f"📊 Raw response keys: {list(data.keys())}")
-            
+
             # Extract group IDs from the response
             # Response format: {"value": [{"id": "group-uuid", "displayName": "group-name", ...}, ...]}
-            groups_data = data.get('value', [])
+            groups_data = data.get("value", [])
             print(f"📦 Found {len(groups_data)} membership objects")
-            
+
             # Filter to only security groups (not all memberOf are groups)
             # Microsoft Graph returns various types: groups, roles, administrative units
             group_ids = []
             for item in groups_data:
                 # Check if this is actually a group
-                odata_type = item.get('@odata.type', '')
-                display_name = item.get('displayName', 'Unknown')
-                group_id = item.get('id', '')
-                
+                odata_type = item.get("@odata.type", "")
+                display_name = item.get("displayName", "Unknown")
+                group_id = item.get("id", "")
+
                 print(f"  - Type: {odata_type}, Name: '{display_name}', ID: {group_id}")
-                
+
                 # Only include actual groups (not roles or other membership types)
-                if '#microsoft.graph.group' in odata_type:
+                if "#microsoft.graph.group" in odata_type:
                     group_ids.append(group_id)
-                    print(f"    ✅ Added to group list")
+                    print("    ✅ Added to group list")
                 else:
-                    print(f"    ⏭️  Skipped (not a group)")
-            
-            print(f"")
+                    print("    ⏭️  Skipped (not a group)")
+
+            print("")
             print(f"✅ FINAL RESULT: User belongs to {len(group_ids)} Azure AD groups:")
             for gid in group_ids:
                 print(f"   - {gid}")
-            print("=" * 80)
-            
+            print("================================================================================")
+
             return group_ids
-        
+
         elif response.status_code == 401:
-            print(f"❌ AUTHENTICATION FAILED (401 Unauthorized)")
-            print(f"   This usually means:")
-            print(f"   1. Access token is expired")
-            print(f"   2. Access token doesn't have required permissions")
-            print(f"   3. Token is invalid or malformed")
+            print("❌ AUTHENTICATION FAILED (401 Unauthorized)")
+            print("   This usually means:")
+            print("   1. Graph access token is expired")
+            print("   2. Graph token doesn't have required permissions")
+            print("   3. Token is invalid or malformed")
             print(f"📄 Response body: {response.text[:500]}")
-            print("=" * 80)
+            print("================================================================================")
             return []
-        
+
         elif response.status_code == 403:
-            print(f"❌ PERMISSION DENIED (403 Forbidden)")
-            print(f"   This usually means:")
-            print(f"   1. App registration doesn't have 'GroupMember.Read.All' permission")
-            print(f"   2. Admin hasn't granted consent for the permission")
-            print(f"   3. User doesn't have permission to read group memberships")
-            print(f"")
-            print(f"   TO FIX:")
-            print(f"   1. Go to Azure Portal → App Registrations → Your App")
-            print(f"   2. API Permissions → Add 'GroupMember.Read.All' (Delegated)")
-            print(f"   3. Click 'Grant admin consent'")
+            print("❌ PERMISSION DENIED (403 Forbidden)")
+            print("   This usually means:")
+            print("   1. App registration doesn't have 'GroupMember.Read.All' permission")
+            print("   2. Admin hasn't granted consent for the permission")
+            print("   3. User doesn't have permission to read group memberships")
+            print("")
+            print("   TO FIX:")
+            print("   1. Go to Azure Portal → App Registrations → Your App")
+            print("   2. API Permissions → Add 'GroupMember.Read.All' (Delegated)")
+            print("   3. Click 'Grant admin consent'")
             print(f"📄 Response body: {response.text[:500]}")
-            print("=" * 80)
+            print("================================================================================")
             return []
-        
+
         else:
             print(f"❌ UNEXPECTED ERROR (HTTP {response.status_code})")
             print(f"📄 Response body: {response.text[:500]}")
-            print("=" * 80)
+            print("================================================================================")
             return []
-    
+
     except requests.exceptions.Timeout:
-        print(f"❌ REQUEST TIMEOUT (>10 seconds)")
-        print(f"   Microsoft Graph API did not respond in time")
-        print(f"   This might be a network issue or Azure service slowdown")
-        print("=" * 80)
+        print("❌ REQUEST TIMEOUT (>10 seconds)")
+        print("   Microsoft Graph API did not respond in time")
+        print("   This might be a network issue or Azure service slowdown")
+        print("================================================================================")
         return []
-    
+
     except requests.exceptions.RequestException as e:
         print(f"❌ NETWORK ERROR: {str(e)}")
-        print(f"   Could not connect to Microsoft Graph API")
-        print(f"   Check network connectivity and DNS resolution")
-        print("=" * 80)
+        print("   Could not connect to Microsoft Graph API")
+        print("   Check network connectivity and DNS resolution")
+        print("================================================================================")
         return []
-    
+
     except Exception as e:
         print(f"❌ UNEXPECTED EXCEPTION: {type(e).__name__}: {str(e)}")
         import traceback
+
         print(traceback.format_exc())
-        print("=" * 80)
+        print("================================================================================")
         return []
 
 
