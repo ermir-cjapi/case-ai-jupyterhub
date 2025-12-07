@@ -17,7 +17,7 @@ Requirements:
 import os
 import requests
 from oauthenticator.azuread import AzureAdOAuthenticator
-from traitlets import Set, Unicode
+from traitlets import Set
 
 
 async def fetch_user_groups_from_graph_api(access_token):
@@ -167,6 +167,25 @@ class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
     - See: azure-doc/AZURE-AD-FREE-TIER-SOLUTION.md
     """
     
+    # Define these traits explicitly so JupyterHub recognizes them
+    # These allow group-based authorization configuration
+    allowed_groups = Set(
+        config=True,
+        help="""
+        Set of Azure AD group Object IDs that are allowed to login.
+        If empty, all authenticated users are allowed.
+        Example: {"group-uuid-1", "group-uuid-2"}
+        """
+    )
+    
+    admin_groups = Set(
+        config=True,
+        help="""
+        Set of Azure AD group Object IDs whose members have admin privileges.
+        Example: {"admin-group-uuid"}
+        """
+    )
+    
     async def update_auth_model(self, auth_model):
         """
         Called after authentication to enrich user info with groups.
@@ -182,7 +201,8 @@ class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
         # Call parent class method first
         auth_model = await super().update_auth_model(auth_model)
         
-        print(f"👤 User: {auth_model.get('name', 'Unknown')}")
+        username = auth_model.get('name', 'Unknown')
+        print(f"👤 User: {username}")
         print(f"📧 Email: {auth_model.get('auth_state', {}).get('user', {}).get('email', 'Unknown')}")
         
         # Get access_token from auth_state
@@ -197,16 +217,33 @@ class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
             return auth_model
         
         # Fetch groups from Microsoft Graph API
-        groups = await fetch_user_groups_from_graph_api(access_token)
+        user_groups = await fetch_user_groups_from_graph_api(access_token)
         
         # Add groups to auth_model
-        # JupyterHub will use this for authorization checks
-        auth_model['groups'] = groups
+        auth_model['groups'] = user_groups
         
-        print("")
-        print(f"✅ Auth model updated with {len(groups)} groups")
-        print(f"📦 auth_model keys: {list(auth_model.keys())}")
+        print(f"✅ Auth model updated with {len(user_groups)} groups")
+        
+        # Check group-based authorization
+        if self.allowed_groups:
+            print(f"🔒 Checking allowed_groups: {self.allowed_groups}")
+            if not any(group in self.allowed_groups for group in user_groups):
+                print(f"❌ User {username} not in any allowed groups!")
+                print(f"   User groups: {user_groups}")
+                print(f"   Allowed groups: {self.allowed_groups}")
+                print("=" * 80)
+                return None  # Deny access
+            else:
+                print(f"✅ User {username} is in allowed groups")
+        
+        # Check admin group membership
+        if self.admin_groups:
+            is_admin = any(group in self.admin_groups for group in user_groups)
+            auth_model['admin'] = is_admin
+            print(f"👑 Admin status: {is_admin}")
+            if is_admin:
+                print(f"   User is in admin group(s): {self.admin_groups & set(user_groups)}")
+        
         print("=" * 80)
-        
         return auth_model
 
