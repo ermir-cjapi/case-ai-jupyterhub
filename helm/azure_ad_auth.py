@@ -17,6 +17,7 @@ Requirements:
 import os
 import requests
 from oauthenticator.azuread import AzureAdOAuthenticator
+from traitlets import Set, Unicode
 
 
 async def fetch_user_groups_from_graph_api(access_token):
