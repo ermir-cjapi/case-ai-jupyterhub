@@ -22,6 +22,22 @@ hub:
       admin_access: true
   
   # ============================================
+  # MOUNT EXTERNAL PYTHON FILE
+  # ============================================
+  # The azure_ad_auth.py file is mounted via ConfigMap
+  # (created automatically by deploy_jhub_helm.sh)
+  # ============================================
+  extraVolumes:
+    - name: azure-auth-script
+      configMap:
+        name: azure-auth-script
+  
+  extraVolumeMounts:
+    - name: azure-auth-script
+      mountPath: /etc/jupyterhub/scripts
+      readOnly: true
+  
+  # ============================================
   # AZURE AD CREDENTIALS FROM KUBERNETES SECRET
   # ============================================
   # Credentials are stored securely in Kubernetes secret.
@@ -53,193 +69,109 @@ hub:
   
   extraConfig:
     # ============================================
-    # UPGRADE OAUTHENTICATOR TO v17+ FOR GROUP SUPPORT
+    # ENSURE DEPENDENCIES ARE AVAILABLE
     # ============================================
-    00-upgrade-oauthenticator: |
+    # Install required packages if not already present.
+    # This is a safety net in case the Helm chart's base image is outdated.
+    # ============================================
+    00-install-dependencies: |
       import subprocess
       import sys
-      import site
-      print("Upgrading oauthenticator to v17+...")
       
-      # Install to user directory
-      subprocess.check_call([sys.executable, "-m", "pip", "install", "--user", "--upgrade", "--force-reinstall", "oauthenticator>=17.0.0"])
+      # Check and install required packages
+      packages = {
+          'oauthenticator': '17.0.0',  # Need v17+ for group management
+          'requests': '2.31.0',         # For Graph API calls
+      }
       
-      # Put user site-packages at the FRONT of sys.path so it's checked first
-      user_site = site.getusersitepackages()
-      if user_site in sys.path:
-          sys.path.remove(user_site)
-      sys.path.insert(0, user_site)
+      print("=" * 80)
+      print("📦 Checking Python dependencies...")
+      print("=" * 80)
       
-      # Remove any already-imported oauthenticator modules from cache
-      modules_to_remove = [key for key in sys.modules.keys() if key.startswith('oauthenticator')]
-      for mod in modules_to_remove:
-          del sys.modules[mod]
+      for package, min_version in packages.items():
+          try:
+              # Try to import the package
+              __import__(package)
+              print(f"✅ {package} is available")
+          except ImportError:
+              print(f"⚠️  {package} not found, installing...")
+              subprocess.check_call([
+                  sys.executable, "-m", "pip", "install", "--quiet",
+                  f"{package}>={min_version}"
+              ])
+              print(f"✅ {package} installed successfully")
       
-      print(f"oauthenticator v17+ installed to: {user_site}")
-      print(f"Removed {len(modules_to_remove)} cached modules")
-      print("sys.path[0] =", sys.path[0])
-      print("oauthenticator upgrade complete!")
+      print("=" * 80)
+      print("✅ All dependencies ready!")
+      print("=" * 80)
     
     # ============================================
-    # AZURE AD / ENTRA ID AUTHENTICATION
+    # AZURE AD AUTHENTICATION WITH GRAPH API
     # ============================================
-    # Credentials are loaded from Kubernetes secret (see extraEnv above).
+    # Implementation is in external file: helm/azure_ad_auth.py
+    # Mounted at: /etc/jupyterhub/scripts/azure_ad_auth.py
     #
-    # First-time setup:
-    # 1. Create the secret: cd helm && ./create-azure-secret.sh
-    # 2. Deploy JupyterHub: ./deploy_jhub_helm.sh
-    #
-    # To update credentials:
-    # 1. Delete old secret: kubectl delete secret jupyterhub-azure-oauth -n jupyterhub-test
-    # 2. Re-run: ./create-azure-secret.sh
-    # 3. Restart hub: kubectl rollout restart deployment hub -n jupyterhub-test
+    # Why external file?
+    # - Cleaner separation of concerns
+    # - Easier to test Python code independently
+    # - Better code organization
+    # 
+    # See: azure-doc/AZURE-AD-FREE-TIER-SOLUTION.md
     # ============================================
     01-azure-ad-auth: |
       import os
-      from oauthenticator.azuread import AzureAdOAuthenticator
-      c.JupyterHub.authenticator_class = AzureAdOAuthenticator
+      
+      # Load external Python file with Azure AD implementation
+      print("📂 Loading Azure AD auth from external file...")
+      exec(open('/etc/jupyterhub/scripts/azure_ad_auth.py').read())
       
       # ============================================
       # CREDENTIALS FROM KUBERNETES SECRET
       # ============================================
-      # These are loaded from environment variables (set via extraEnv above)
-      # The actual values are stored in Kubernetes secret: jupyterhub-azure-oauth
-      # ============================================
-      
       c.AzureAdOAuthenticator.tenant_id = os.environ.get('AZURE_TENANT_ID')
       c.AzureAdOAuthenticator.client_id = os.environ.get('AZURE_CLIENT_ID')
       c.AzureAdOAuthenticator.client_secret = os.environ.get('AZURE_CLIENT_SECRET')
       c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
       
-      # ============================================
-      # STEP 1: DEBUG - INSPECT TOKEN STRUCTURE
-      # ============================================
-      # We need to see WHERE groups are actually stored in the Azure AD token
-      # ============================================
-      
-      # ============================================
-      # GROUP-BASED AUTHORIZATION - WORKING CONFIG
-      # ============================================
-      # Groups found in: auth_state['user']['groups']
-      # Format: List of group Object IDs (GUIDs)
-      # ============================================
-      
-      # MUST enable auth_state for group management to work
+      # MUST enable auth_state to store access_token for Graph API
       c.Authenticator.enable_auth_state = True
       
+      # Use our custom authenticator (defined in azure_ad_auth.py)
+      c.JupyterHub.authenticator_class = AzureAdGraphAuthenticator
+      c.AzureAdGraphAuthenticator.manage_groups = True
+      
       # ============================================
-      # FINAL SOLUTION: Azure AD Group Authorization
+      # GROUP-BASED AUTHORIZATION
       # ============================================
-      # Problem: oauthenticator v17 defaults to auth_state_groups_key = "user.groups"
-      # But Azure AD puts groups in auth_state['id_token']['groups']
-      # Solution: Use a callable to extract groups from the correct location
+      # IMPORTANT: Use Group Object IDs (not names!)
+      # 
+      # Why Object IDs?
+      # - Group names can be changed in Azure AD
+      # - Object IDs are permanent UUIDs
+      # - More reliable and secure
+      #
+      # How to find Object IDs:
+      # 1. Azure Portal → Groups → [Your Group] → Overview
+      # 2. Copy "Object ID" field
+      # 
+      # Or check hub logs after login to see:
+      #   - JupyterHub-Admins: d6c49ed5-eefc-48c4-90d0-2026f5fe3916
+      #   - JupyterHub-Users: 6543851f-fd97-40e8-b097-ab5a71e44ef2
       # ============================================
       
-      # Enable group management
-      c.AzureAdOAuthenticator.manage_groups = True
-      
-      # Custom function to extract groups from id_token JWT
-      import jwt
-      def get_groups_from_id_token(auth_state):
-          """Extract groups from Azure AD id_token by decoding JWT"""
-          print("=" * 80)
-          print("DEBUG get_groups_from_id_token called")
-          if auth_state and 'id_token' in auth_state:
-              id_token_str = auth_state['id_token']
-              try:
-                  # Decode JWT without verification (we trust it came from Azure AD via HTTPS)
-                  decoded = jwt.decode(id_token_str, options={"verify_signature": False})
-                  print("DEBUG decoded id_token keys:", list(decoded.keys()))
-                  if 'groups' in decoded:
-                      groups = decoded['groups']
-                      print("DEBUG FOUND GROUPS:", groups)
-                      print("=" * 80)
-                      return groups
-                  else:
-                      print("DEBUG: 'groups' not in decoded token")
-              except Exception as e:
-                  print("DEBUG: Error decoding JWT:", str(e))
-          print("DEBUG: No groups found, returning empty list")
-          print("=" * 80)
-          return []
-      
-      # Set auth_state_groups_key to our custom function
-      c.AzureAdOAuthenticator.auth_state_groups_key = get_groups_from_id_token
-      
-      # TEMPORARY: Also allow all users so you can at least login
-      c.Authenticator.allow_all = True
-      c.Authenticator.admin_users = {"cjapi, ermir"}
-      
-      # Your actual group memberships:
-      # - 4fb32c31-b135-43d5-a00e-9e566e6aceff
-      # - d6c49ed5-eefc-48c4-90d0-2026f5fe3916 (JupyterHub-Admins)
-      
-      # Allow users in these groups
-      c.AzureAdOAuthenticator.allowed_groups = {
-          "4fb32c31-b135-43d5-a00e-9e566e6aceff",
-          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916",
-          "6543851f-fd97-40e8-b097-ab5a71e44ef2"
+      # Allow these groups to access JupyterHub
+      c.AzureAdGraphAuthenticator.allowed_groups = {
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916",  # JupyterHub-Admins
+          "6543851f-fd97-40e8-b097-ab5a71e44ef2",  # JupyterHub-Users
+          "4fb32c31-b135-43d5-a00e-9e566e6aceff"   # (check logs for name)
       }
       
-      # Admin group
-      c.AzureAdOAuthenticator.admin_groups = {
-          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"
+      # Grant admin privileges to this group
+      c.AzureAdGraphAuthenticator.admin_groups = {
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
       }
       
-      
-      # ============================================
-      # OPTION B: Use Group Names (requires Azure AD Premium)
-      # ============================================
-      # If you have Azure AD Premium, you can configure Azure AD
-      # to send group names instead of IDs. Uncomment below:
-      #
-      # c.AzureAdOAuthenticator.allowed_groups = {
-      #     "JupyterHub-Users",
-      #     "JupyterHub-Admins"
-      # }
-      # c.AzureAdOAuthenticator.admin_groups = {
-      #     "JupyterHub-Admins"
-      # }
-      
-      
-      # ============================================
-      # ALTERNATIVE: Email-Based Access Control (Not Recommended)
-      # ============================================
-      # If you prefer email-based control instead of groups, comment out the
-      # allowed_groups and admin_groups above, and uncomment these:
-      #
-      # c.Authenticator.allowed_users = {
-      #     "user1@yourcompany.com",
-      #     "user2@yourcompany.com"
-      # }
-      # c.Authenticator.admin_users = {
-      #     "admin@yourcompany.com"
-      # }
-      #
-      # NOTE: Requires JupyterHub redeploy to add/remove users!
-      # ============================================
-
-    # ============================================
-    # ALTERNATIVE: GitHub OAuth (Commented out)
-    # ============================================
-    # 00-github-auth: |
-    #   from oauthenticator.github import GitHubOAuthenticator
-    #   c.JupyterHub.authenticator_class = GitHubOAuthenticator
-    #   
-    #   c.GitHubOAuthenticator.client_id = "Ov23lidtVx7ofQPm6Qvz"
-    #   c.GitHubOAuthenticator.client_secret = "ef282ca998be6a552b00f3ccfe62f18f195a9eae"
-    #   c.GitHubOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
-    #   c.Authenticator.allow_all = True
-    #   c.Authenticator.admin_users = {"your-github-username"}
-    
-    # ============================================
-    # ALTERNATIVE: No Authentication (Testing only)
-    # ============================================
-    # 00-simple-auth: |
-    #   from jupyterhub.auth import DummyAuthenticator
-    #   c.JupyterHub.authenticator_class = DummyAuthenticator
-    #   c.DummyAuthenticator.password = ""
-    #   c.Authenticator.admin_users = {"admin"}
+      print("✅ Azure AD auth configuration complete")
 
 singleuser:
   image:

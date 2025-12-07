@@ -22,11 +22,21 @@ echo "Adding JupyterHub Helm repo..."
 helm repo add jupyterhub https://jupyterhub.github.io/helm-chart >/dev/null 2>&1 || true
 helm repo update jupyterhub
 
+# Create ConfigMap with Azure AD auth script
+echo "Creating ConfigMap with Azure AD auth script..."
+kubectl create configmap azure-auth-script \
+  --from-file=helm/azure_ad_auth.py \
+  --namespace="${NAMESPACE}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+echo "✅ ConfigMap created/updated"
+echo ""
+
 # Deploy JupyterHub
 # Helm will automatically:
 # - Create namespace if it doesn't exist (with --create-namespace)
 # - Create all required resources (services, deployments, PVCs, etc.)
-# - Configure everything from values-v1.yaml
+# - Mount ConfigMap as external Python file
 echo "Deploying JupyterHub ${RELEASE_NAME} to namespace ${NAMESPACE}..."
 helm upgrade --install "${RELEASE_NAME}" jupyterhub/jupyterhub \
   --namespace "${NAMESPACE}" \
