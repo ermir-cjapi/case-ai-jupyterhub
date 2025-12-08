@@ -1,93 +1,27 @@
-# Azure AD Integration Documentation
+# Azure AD Authentication for JupyterHub
+
+This document explains how JupyterHub integrates with Azure AD for authentication and group-based authorization.
 
 ## Overview
 
-This directory contains comprehensive documentation for integrating JupyterHub with Azure AD (Microsoft Entra ID) for authentication and group-based authorization.
+JupyterHub uses Azure AD (Microsoft Entra ID) for:
+- **Authentication**: Users log in with their Azure AD credentials
+- **Authorization**: Access is controlled by Azure AD group membership
+- **Admin Rights**: Users in specific groups get admin privileges
 
----
+## Why We Use Microsoft Graph API
 
-## The Problem We Solved
+**Problem**: Azure AD Free tier does NOT include groups in OAuth tokens.
 
-**Challenge**: Azure AD Free tier does NOT include group claims in OAuth tokens, making group-based authorization seemingly impossible.
+**Solution**: We fetch groups via Microsoft Graph API using Client Credentials flow.
 
-**Solution**: Fetch user groups via Microsoft Graph API after authentication.
+```
+User logs in → Azure AD returns user info → 
+JupyterHub calls Graph API → "What groups is this user in?" →
+Grant/deny access based on group membership
+```
 
----
-
-## Documentation Index
-
-### 1. 📘 [Azure AD Free Tier Solution](./AZURE-AD-FREE-TIER-SOLUTION.md)
-
-**Read this first!**
-
-- Explains Azure AD tier limitations (Free vs Premium)
-- Why groups aren't in OAuth tokens
-- How the Microsoft Graph API solution works
-- Performance considerations
-- Migration path to Premium (if needed)
-
-**Key Topics**:
-- Azure AD tier comparison
-- Microsoft Graph API implementation
-- Debugging guide with logs
-- Rate limits and performance
-
----
-
-### 2. 🚀 [Deployment Guide](./DEPLOY-GRAPH-API-SOLUTION.md)
-
-**Step-by-step deployment instructions**
-
-- Prerequisites checklist
-- Azure AD permission setup
-- Deployment commands
-- Testing procedures
-- Troubleshooting common errors
-
-**Use this when**:
-- Deploying for the first time
-- Upgrading from token-based to Graph API
-- Troubleshooting login issues
-
----
-
-### 3. 📝 [Post-Mortem Analysis](./POST-MORTEM.md)
-
-**What we learned the hard way**
-
-- Timeline of 8-hour debugging session
-- What went wrong (and why)
-- What we did right
-- Lessons learned
-- Prevention strategies
-
-**Use this when**:
-- Learning from our mistakes
-- Training new team members
-- Planning future integrations
-- Understanding the "why" behind decisions
-
----
-
-## Quick Start
-
-### For First-Time Setup
-
-1. **Read**: [AZURE-AD-FREE-TIER-SOLUTION.md](./AZURE-AD-FREE-TIER-SOLUTION.md) (15 min)
-2. **Configure**: Add `GroupMember.Read.All` permission in Azure Portal
-3. **Deploy**: Follow [DEPLOY-GRAPH-API-SOLUTION.md](./DEPLOY-GRAPH-API-SOLUTION.md)
-4. **Test**: Login and watch logs for Graph API calls
-
-### For Troubleshooting
-
-1. **Check**: [DEPLOY-GRAPH-API-SOLUTION.md](./DEPLOY-GRAPH-API-SOLUTION.md) → Troubleshooting section
-2. **Review**: Hub pod logs for detailed error messages
-3. **Verify**: Azure AD permissions are granted
-4. **Reference**: [POST-MORTEM.md](./POST-MORTEM.md) for common pitfalls
-
----
-
-## Architecture Diagram
+## Architecture
 
 ```
 ┌─────────────┐
@@ -101,28 +35,23 @@ This directory contains comprehensive documentation for integrating JupyterHub w
        │ 2. Redirect to Azure AD
        ↓
 ┌─────────────────┐
-│   Azure AD      │ ← Free Tier (Groups NOT in token)
+│   Azure AD      │
 │   OAuth Login   │
 └──────┬──────────┘
-       │ 3. Returns: access_token + id_token
-       │    (id_token has NO groups)
+       │ 3. Returns user info (email, name, Object ID)
        ↓
 ┌─────────────────┐
-│   JupyterHub    │
-│   Authenticator │ 4. Extracts access_token
+│   JupyterHub    │ 4. Gets app-only token (Client Credentials)
 └──────┬──────────┘
-       │ 5. Call Graph API
+       │ 5. Call Graph API: /users/{user-id}/memberOf
        ↓
 ┌─────────────────────────────┐
 │  Microsoft Graph API        │
-│  GET /me/memberOf           │
-│  Authorization: Bearer      │
 └──────┬──────────────────────┘
-       │ 6. Returns: List of groups
+       │ 6. Returns list of groups
        ↓
 ┌─────────────────┐
-│   JupyterHub    │ 7. Check allowed_groups
-│   Authorization │    & admin_groups
+│   JupyterHub    │ 7. Check allowed_groups & admin_groups
 └─────────────────┘
        │ 8. Grant/Deny Access
        ↓
@@ -132,246 +61,138 @@ This directory contains comprehensive documentation for integrating JupyterHub w
 └─────────────────┘
 ```
 
----
+## Required Azure AD Configuration
+
+### 1. App Registration
+
+Create an app registration in Azure Portal:
+- **Name**: JupyterHub Production
+- **Redirect URI**: `https://your-domain.com/hub/oauth_callback`
+
+### 2. API Permissions
+
+Add these permissions to your app registration:
+
+| Permission | Type | Purpose |
+|------------|------|---------|
+| `User.Read` | Delegated | Read user profile during login |
+| `GroupMember.Read.All` | **Application** | Read any user's group memberships |
+
+**Important**: Click "Grant admin consent" after adding permissions!
+
+### 3. Client Secret
+
+Create a client secret and note the **value** (not the ID).
 
 ## Key Files
 
-### Configuration
+| File | Purpose |
+|------|---------|
+| `helm/azure_ad_auth.py` | Custom authenticator with Graph API integration |
+| `helm/values-helm.yaml` | JupyterHub configuration |
+| `helm/create-azure-secret.sh` | Creates Kubernetes secret with credentials |
+| `helm/deploy_jhub_helm.sh` | Deployment script |
 
-```
-case-ai-jupyterhub/
-├── helm/
-│   ├── values-helm.yaml           ← Main config with Graph API code
-│   ├── deploy_jhub_helm.sh        ← Deployment script
-│   └── create-azure-secret.sh     ← Creates K8s secret for credentials
-│
-└── azure-doc/                      ← You are here
-    ├── README.md                   ← This file
-    ├── AZURE-AD-FREE-TIER-SOLUTION.md
-    ├── DEPLOY-GRAPH-API-SOLUTION.md
-    └── POST-MORTEM.md
-```
+## Configuration
 
-### Critical Code Section
+### Group IDs
 
-The Graph API integration is in `helm/values-helm.yaml`:
+Groups are identified by their **Object ID** (UUID), not display name:
 
-```yaml
-hub:
-  extraConfig:
-    01-azure-ad-auth: |
-      # Custom function: fetch_user_groups_from_graph_api()
-      # Custom class: AzureAdGraphAuthenticator
-      # Calls: https://graph.microsoft.com/v1.0/me/memberOf
+```python
+c.AzureAdGraphAuthenticator.allowed_groups = {
+    "d6c49ed5-eefc-48c4-90d0-2026f5fe3916",  # JupyterHub-Admins
+    "6543851f-fd97-40e8-b097-ab5a71e44ef2",  # JupyterHub-Users
+}
+
+c.AzureAdGraphAuthenticator.admin_groups = {
+    "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
+}
 ```
 
----
+**How to find Object IDs**: Azure Portal → Groups → [Your Group] → Overview → Object ID
 
-## Common Tasks
+### Adding/Removing Groups
 
-### Add a New User Group
+1. Edit `helm/values-helm.yaml`
+2. Add/remove group IDs in `allowed_groups` or `admin_groups`
+3. Run `./deploy_jhub_helm.sh`
+4. Users must re-login for changes to take effect
 
-1. **Azure Portal** → **Groups** → **New group**
-2. Copy the group's **Object ID** (UUID)
-3. Edit `helm/values-helm.yaml`:
-   ```python
-   c.AzureAdGraphAuthenticator.allowed_groups = {
-       "existing-group-id",
-       "new-group-id",  # ← Add here
-   }
-   ```
-4. Redeploy:
-   ```bash
-   cd helm
-   ./deploy_jhub_helm.sh
-   ```
+## Deployment
 
-### Change Admin Group
-
-1. Edit `helm/values-helm.yaml`:
-   ```python
-   c.AzureAdGraphAuthenticator.admin_groups = {
-       "new-admin-group-id"
-   }
-   ```
-2. Redeploy
-3. Users must re-login for changes to take effect
-
-### Check Current Groups
+### First-Time Setup
 
 ```bash
-# Watch hub logs during login
-kubectl logs -n jupyterhub-test -l component=hub -f
+cd helm
 
-# Look for:
-# ✅ FINAL RESULT: User belongs to 2 Azure AD groups:
-#    - d6c49ed5-eefc-48c4-90d0-2026f5fe3916
-#    - 6543851f-fd97-40e8-b097-ab5a71e44ef2
+# 1. Create secret with Azure credentials
+./create-azure-secret.sh
+
+# 2. Deploy JupyterHub
+./deploy_jhub_helm.sh
 ```
+
+### Update Configuration
+
+```bash
+cd helm
+
+# Update ConfigMap with latest code
+kubectl create configmap azure-auth-script \
+  --from-file=azure_ad_auth.py \
+  --namespace=jupyterhub-test \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Deploy changes
+./deploy_jhub_helm.sh
+```
+
+## Troubleshooting
+
+### View Logs
+
+```bash
+kubectl logs -n jupyterhub-test -l component=hub -f
+```
+
+### Common Errors
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| 403 Forbidden | Missing Graph API permission | Add `GroupMember.Read.All` (Application) + grant consent |
+| User not found | Guest user email lookup failed | Code uses Object ID (should work automatically) |
+| No groups found | User not in any Azure AD groups | Add user to groups in Azure Portal |
+| Hub pod crash | Python syntax error | Check logs for traceback |
 
 ### Test Graph API Manually
 
-See [DEPLOY-GRAPH-API-SOLUTION.md](./DEPLOY-GRAPH-API-SOLUTION.md) → "Verify Graph API Permissions"
-
----
-
-## FAQ
-
-### Q: Why not just use email-based access control?
-
-**A**: Email-based requires redeploying JupyterHub every time you add/remove users. Group-based lets you manage access in Azure AD without redeployment.
-
-### Q: Can I use group display names instead of IDs?
-
-**A**: Not with Free tier. Azure AD Free sends Object IDs, not names. Premium P1/P2 can be configured to send names, but IDs are more reliable anyway (names can change).
-
-### Q: How much does Azure AD Premium cost?
-
-**A**: 
-- **Premium P1**: ~$6/user/month
-- **Premium P2**: ~$9/user/month
-
-[Official Pricing](https://www.microsoft.com/en-us/security/business/microsoft-entra-pricing)
-
-### Q: Should I upgrade to Premium?
-
-**A**: Consider upgrading if:
-- You have >100 users (avoid Graph API rate limits)
-- Login speed is critical (<500ms)
-- You want simpler code (groups in token automatically)
-- You need Conditional Access policies
-
-**Stay with Free if**:
-- Small team (<50 users)
-- Development/testing environment
-- Cost is a concern
-- Current solution works fine
-
-### Q: What if Graph API is down?
-
-**A**: Users won't be able to login. The code has timeout protection (10 seconds) but no fallback. For production, consider:
-- Monitoring Graph API availability
-- Alerting on failures
-- Emergency hardcoded admin user
-
-### Q: How do I rotate Azure AD credentials?
-
-See `helm/create-azure-secret.sh` for credential management.
-
----
-
-## Monitoring & Alerts (Recommended)
-
-### What to Monitor
-
-1. **Graph API Success Rate**
-   - Watch logs for 403/401 errors
-   - Alert if >5% failures
-
-2. **Login Duration**
-   - Normal: 700-1000ms
-   - Slow: >2000ms (investigate)
-
-3. **Graph API Rate Limits**
-   - Microsoft Graph: 2,000 req/sec
-   - Alert at 80% usage
-
-### How to Monitor
-
 ```bash
-# Count Graph API errors in last hour
-kubectl logs -n jupyterhub-test -l component=hub --since=1h | grep -c "❌ PERMISSION DENIED"
+# Get a token
+TOKEN=$(curl -s -X POST \
+  "https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token" \
+  -d "client_id=<client-id>" \
+  -d "client_secret=<client-secret>" \
+  -d "scope=https://graph.microsoft.com/.default" \
+  -d "grant_type=client_credentials" | jq -r '.access_token')
 
-# Check average login time
-kubectl logs -n jupyterhub-test -l component=hub --tail=1000 | grep "FETCHING USER GROUPS" -A 20 | grep "Response status"
+# Test user lookup
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://graph.microsoft.com/v1.0/users/<user-object-id>/memberOf" | jq
 ```
 
----
+## Guest Users (External Users)
 
-## Upgrade Path to Premium
+Guest users (with `#EXT#` in their userPrincipalName) are fully supported. The code automatically uses the user's **Object ID** instead of email for Graph API lookups.
 
-When you're ready to simplify:
+## Upgrading to Azure AD Premium
 
-### Before (Current - Graph API)
-
-```python
-class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
-    async def update_auth_model(self, auth_model):
-        groups = await fetch_user_groups_from_graph_api(...)
-        auth_model['groups'] = groups
-        return auth_model
-```
-
-### After (Premium - Token-based)
+If you upgrade to Premium P1/P2, you can simplify by using token-based groups:
 
 ```python
-from oauthenticator.azuread import AzureAdOAuthenticator
+# Premium P1/P2 - Groups are in the token automatically
 c.JupyterHub.authenticator_class = AzureAdOAuthenticator
 c.AzureAdOAuthenticator.manage_groups = True
-# Groups automatically in token!
 ```
 
-**Much simpler**, but costs $6/user/month.
-
----
-
-## Support & Troubleshooting
-
-### First Steps
-
-1. **Check hub logs**: `kubectl logs -n jupyterhub-test -l component=hub --tail=200`
-2. **Look for detailed error messages** (we have lots of logging!)
-3. **Check Azure AD permissions** in Portal
-
-### Common Issues & Solutions
-
-| Error | Solution |
-|-------|----------|
-| 403 Forbidden | Add `GroupMember.Read.All` permission + grant consent |
-| 401 Unauthorized | Token expired, clear browser cache and re-login |
-| No groups found | User not in any groups, add them in Azure Portal |
-| Hub pod crashes | Check logs for Python syntax errors |
-
-### Get Help
-
-- See [DEPLOY-GRAPH-API-SOLUTION.md](./DEPLOY-GRAPH-API-SOLUTION.md) → Troubleshooting
-- Check [POST-MORTEM.md](./POST-MORTEM.md) → What We Did Wrong
-- Review hub logs with `-f` flag for real-time debugging
-
----
-
-## Credits
-
-**Solution**: Developed through collaborative debugging  
-**Time Investment**: 9 hours (including 6 hours of wrong approaches)  
-**Key Insight**: Azure Portal error message about group assignment  
-**Documentation**: Created to prevent others from repeating our mistakes
-
----
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0 | Dec 6, 2024 | Initial release - Graph API solution |
-
----
-
-## Next Steps
-
-Ready to deploy? Start here:
-
-→ [DEPLOY-GRAPH-API-SOLUTION.md](./DEPLOY-GRAPH-API-SOLUTION.md)
-
-Want to understand why? Read this:
-
-→ [AZURE-AD-FREE-TIER-SOLUTION.md](./AZURE-AD-FREE-TIER-SOLUTION.md)
-
-Curious about our journey? Check out:
-
-→ [POST-MORTEM.md](./POST-MORTEM.md)
-
----
-
-**Happy JupyterHub-ing! 🚀**
-
+This eliminates the Graph API call but costs ~$6/user/month.

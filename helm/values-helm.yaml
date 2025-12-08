@@ -77,13 +77,6 @@ hub:
         secretKeyRef:
           name: jupyterhub-azure-oauth
           key: client-secret
-    # Optional: explicit resource / audience for the JupyterHub app.
-    # If not set, we fall back to AZURE_CLIENT_ID in extraConfig.
-    AZURE_APP_RESOURCE:
-      valueFrom:
-        secretKeyRef:
-          name: jupyterhub-azure-oauth
-          key: app-resource
   
   extraConfig:
     # ============================================
@@ -140,80 +133,44 @@ hub:
       print("=" * 80)
     
     # ============================================
-    # AZURE AD AUTHENTICATION WITH GRAPH API
+    # AZURE AD AUTHENTICATION
     # ============================================
-    # Implementation is in external file: helm/azure_ad_auth.py
-    # Mounted at: /etc/jupyterhub/scripts/azure_ad_auth.py
-    #
-    # Why external file?
-    # - Cleaner separation of concerns
-    # - Easier to test Python code independently
-    # - Better code organization
-    # 
-    # See: azure-doc/AZURE-AD-FREE-TIER-SOLUTION.md
+    # See: azure-doc/README.md for setup instructions
     # ============================================
     01-azure-ad-auth: |
       import os
       
-      # Load external Python file with Azure AD implementation
-      print("📂 Loading Azure AD auth from external file...")
+      # Load Azure AD authenticator from external file
       exec(open('/etc/jupyterhub/scripts/azure_ad_auth.py').read(), globals())
       
-      # Verify the class was loaded
-      print(f"✅ AzureAdGraphAuthenticator class loaded: {AzureAdGraphAuthenticator}")
-      
-      # ============================================
-      # CREDENTIALS FROM KUBERNETES SECRET
-      # ============================================
+      # Azure AD OAuth configuration
       c.AzureAdOAuthenticator.tenant_id = os.environ.get('AZURE_TENANT_ID')
       c.AzureAdOAuthenticator.client_id = os.environ.get('AZURE_CLIENT_ID')
       c.AzureAdOAuthenticator.client_secret = os.environ.get('AZURE_CLIENT_SECRET')
       c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
-
-      # Enable auth_state to store user info for group fetching
       c.Authenticator.enable_auth_state = True
       
-      # Use our custom authenticator (defined in azure_ad_auth.py)
+      # Use custom authenticator with Graph API group fetching
       c.JupyterHub.authenticator_class = AzureAdGraphAuthenticator
       c.AzureAdGraphAuthenticator.manage_groups = True
-      # We implement our own allowed_groups/admin_groups checks; disable
-      # oauthenticator's built-in auth_state_groups_key handling to avoid
-      # noisy log errors when 'user.groups' is not present.
-      
-      print(f"✅ Authenticator set to: {c.JupyterHub.authenticator_class}")
       
       # ============================================
       # GROUP-BASED AUTHORIZATION
       # ============================================
-      # IMPORTANT: Use Group Object IDs (not names!)
-      # 
-      # Why Object IDs?
-      # - Group names can be changed in Azure AD
-      # - Object IDs are permanent UUIDs
-      # - More reliable and secure
-      #
-      # How to find Object IDs:
-      # 1. Azure Portal → Groups → [Your Group] → Overview
-      # 2. Copy "Object ID" field
-      # 
-      # Or check hub logs after login to see:
-      #   - JupyterHub-Admins: d6c49ed5-eefc-48c4-90d0-2026f5fe3916
-      #   - JupyterHub-Users: 6543851f-fd97-40e8-b097-ab5a71e44ef2
+      # Use Group Object IDs from Azure Portal:
+      #   Groups → [Your Group] → Overview → Object ID
       # ============================================
       
-      # Allow these groups to access JupyterHub
       c.AzureAdGraphAuthenticator.allowed_groups = {
           "d6c49ed5-eefc-48c4-90d0-2026f5fe3916",  # JupyterHub-Admins
           "6543851f-fd97-40e8-b097-ab5a71e44ef2",  # JupyterHub-Users
-          "4fb32c31-b135-43d5-a00e-9e566e6aceff"   # (check logs for name)
       }
       
-      # Grant admin privileges to this group
       c.AzureAdGraphAuthenticator.admin_groups = {
-          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916"   # JupyterHub-Admins
+          "d6c49ed5-eefc-48c4-90d0-2026f5fe3916",  # JupyterHub-Admins
       }
       
-      print("✅ Azure AD auth configuration complete")
+      print("✅ Azure AD authentication configured")
 
 singleuser:
   image:

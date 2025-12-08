@@ -1,92 +1,67 @@
 # JupyterHub on Kubernetes
 
-GPU-enabled JupyterHub for your NVIDIA server.
+GPU-enabled JupyterHub with Azure AD authentication for your NVIDIA server.
 
 ## Structure
 
 ```
-├── local-testing/     # Test locally with Docker Compose
-├── k8s-manifests/     # Plain Kubernetes YAML files (learn step-by-step)
-├── helm/              # Helm deployment (one-command deploy)
+├── helm/              # Helm deployment (recommended)
+├── azure-doc/         # Azure AD setup documentation
+├── k8s-manifests/     # Plain Kubernetes YAML (learning)
 ├── images/            # Custom notebook image
-└── aiv-production/    # AIV production deployment (separate)
+├── local-testing/     # Local Docker Compose testing
+└── aiv-production/    # AIV production deployment
 ```
 
-## 🎯 Choose Your Deployment Method
-
-### Option 1: Kubernetes Manifests (Recommended for Learning)
-See every resource clearly, understand each component.
+## Quick Start (Helm)
 
 ```bash
-# 1. Enable GPU sharing (IMPORTANT for multi-user! Run once)
-./setup-gpu-timeslicing.sh  # Converts 1 GPU → 4 users
+# 1. Enable GPU sharing (run once)
+./setup-gpu-timeslicing.sh
 
-# 2. Build image
+# 2. Build notebook image
 source lab-config.env
 docker login
 ./images/build_base_image.sh
 
-# 3. Generate secret
-openssl rand -hex 32
-# Update k8s-manifests/02-secrets.yaml line 11
-
-# 4. Configure Azure AD
-# Edit k8s-manifests/01-configmap.yaml lines 44-47
-
-# 5. Deploy
-cd k8s-manifests
-./deploy_k8s_manifests.sh
-
-# Done! Access at https://jupyterhub.ccrolabs.com
-```
-
-**See:** `k8s-manifests/README.md` for detailed explanation of each resource.
-
-### Option 2: Helm (Quick & Clean)
-One command, Helm manages everything.
-
-```bash
-# 1. Enable GPU sharing (IMPORTANT for multi-user! Run once)
-./setup-gpu-timeslicing.sh  # Converts 1 GPU → 4 users
-
-# 2. Build image
-source lab-config.env
-docker login
-./images/build_base_image.sh
-
-# 3. Generate secret
-openssl rand -hex 32
-# Update helm/values-helm.yaml line 6
-
-# 4. Configure Azure AD
-# Edit helm/values-helm.yaml lines 32-46
-
-# 5. Deploy
+# 3. Create Azure AD secret
 cd helm
+./create-azure-secret.sh
+
+# 4. Deploy
 ./deploy_jhub_helm.sh
 
-# Done! Access at https://jupyterhub.ccrolabs.com
+# Access at https://jupyterhub.ccrolabs.com
 ```
 
-## Configuration
+## Azure AD Authentication
 
-**K8s Manifests:** Edit `k8s-manifests/01-configmap.yaml`  
-**Helm:** Edit `helm/values-helm.yaml`
+JupyterHub uses Azure AD for authentication with group-based authorization.
 
-Both configure:
-- Authentication (GitHub, Azure AD, or none)
-- Resource limits (CPU, RAM, GPU)
-- Storage settings
-- Admin users
+### Required Azure AD Setup
 
-## Cloudflare Setup
+1. **App Registration** with redirect URI: `https://your-domain.com/hub/oauth_callback`
+2. **API Permissions**:
+   - `User.Read` (Delegated)
+   - `GroupMember.Read.All` (Application) + Admin Consent
+3. **Client Secret** created
 
-Cloudflare tunnel handles ingress:
-1. Cloudflare dashboard → Tunnel → jupyterhub.ccrolabs.com
-2. Points to: `http://localhost:80` (Traefik on k3s)
-3. JupyterHub service → proxy-public → port 80
+### Configuration
 
-**No ingress resource needed** - Cloudflare connects directly.
+Edit `helm/values-helm.yaml`:
+
+```python
+c.AzureAdGraphAuthenticator.allowed_groups = {
+    "group-object-id-1",  # JupyterHub-Admins
+    "group-object-id-2",  # JupyterHub-Users
+}
+
+c.AzureAdGraphAuthenticator.admin_groups = {
+    "group-object-id-1",  # JupyterHub-Admins
+}
+```
+
+**See:** `azure-doc/README.md` for detailed setup instructions.
 
 ## Common Commands
 
@@ -95,48 +70,35 @@ Cloudflare tunnel handles ingress:
 kubectl get pods -n jupyterhub-test
 
 # Logs
-kubectl logs -n jupyterhub-test -l component=hub
+kubectl logs -n jupyterhub-test -l component=hub -f
 
-# Redeploy (K8s manifests)
-cd k8s-manifests && ./deploy_k8s_manifests.sh
-
-# Redeploy (Helm)
+# Redeploy
 cd helm && ./deploy_jhub_helm.sh
 
-# Delete (K8s manifests)
-cd k8s-manifests && ./delete_k8s_manifests.sh
-
-# Delete (Helm)
+# Delete
 cd helm && ./delete_jhub_helm.sh
 ```
 
-## 🎮 GPU Support & Multi-User Sharing
+## GPU Support
 
-### GPU is Enabled by Default
-**K8s Manifests:** `k8s-manifests/01-configmap.yaml` lines 36-37  
-**Helm:** `helm/values-helm.yaml` lines 114-117
-
-### ⚠️ Important: Enable GPU Sharing First!
-
-**Without GPU sharing:**
-- 1 RTX 5090 → Only 1 user at a time
-- Other users wait indefinitely (Pending pods)
-
-**With GPU sharing (time-slicing):**
-- 1 RTX 5090 → 4 users simultaneously
-- Each gets ~25% when all active, 100% when alone
-
-### Enable GPU Sharing (Run Once - Cluster-Wide)
+### Enable GPU Sharing (Run Once)
 
 ```bash
-# This applies to your entire k8s cluster
-# Only needs to be run once regardless of deployment method
-./setup-gpu-timeslicing.sh
+./setup-gpu-timeslicing.sh  # 1 GPU → 4 users
 ```
 
-**See:** `GPU-SHARING.md` for details
+Without sharing: 1 GPU = 1 user at a time  
+With sharing: 1 GPU = 4 concurrent users
+
+**See:** `GPU-USER-PROFILES.md` for profile options.
+
+## Cloudflare Setup
+
+Cloudflare tunnel handles ingress:
+- Tunnel → `jupyterhub.ccrolabs.com` → `http://localhost:30080`
+- No Kubernetes ingress needed
 
 ---
 
-**Local testing?** See `local-testing/` folder  
-**AIV production?** See `aiv-production/` folder
+**Local testing?** See `local-testing/`  
+**AIV production?** See `aiv-production/`
