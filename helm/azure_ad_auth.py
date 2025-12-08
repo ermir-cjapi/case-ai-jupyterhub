@@ -27,8 +27,8 @@ def get_graph_access_token_on_behalf_of(user_assertion: str) -> str:
 
     This keeps us in the 'delegated' model (Option A):
     - User signs in once to JupyterHub
-    - Our app calls Graph *on behalf of* that user using a user assertion
-      (typically the ID token whose audience is this JupyterHub app)
+    - Our app calls Graph *on behalf of* that user using a user access token
+      whose audience is this JupyterHub app
 
     Docs:
     - https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-on-behalf-of-flow
@@ -104,7 +104,7 @@ def get_graph_access_token_on_behalf_of(user_assertion: str) -> str:
         return ""
 
 
-async def fetch_user_groups_from_graph_api(user_assertion):
+async def fetch_user_groups_from_graph_api(user_access_token):
     """
     Fetch user's Azure AD group memberships via Microsoft Graph API.
 
@@ -112,10 +112,10 @@ async def fetch_user_groups_from_graph_api(user_assertion):
     groups in the OAuth token. We must fetch them separately.
 
     Args:
-        user_assertion (str): A JWT issued for this JupyterHub app (typically
-                              the ID token, or an access token whose audience
-                              is this app). We will exchange it for a Graph
-                              access token via OBO.
+        user_access_token (str): An access token issued *for this JupyterHub
+                                 app* (audience == client_id or Application
+                                 ID URI). We will exchange it for a Graph
+                                 access token via OBO.
 
     Returns:
         list: List of group Object IDs (UUIDs) the user belongs to
@@ -124,23 +124,23 @@ async def fetch_user_groups_from_graph_api(user_assertion):
         https://learn.microsoft.com/en-us/graph/api/user-list-memberof
     """
     print("🚨 DEBUG: fetch_user_groups_from_graph_api() ENTERED")
-    print(f"🚨 DEBUG: user_assertion type: {type(user_assertion)}")
-    print(f"🚨 DEBUG: user_assertion value: {user_assertion[:50] if user_assertion else 'None'}...")
+    print(f"🚨 DEBUG: user_access_token type: {type(user_access_token)}")
+    print(f"🚨 DEBUG: user_access_token value: {user_access_token[:50] if user_access_token else 'None'}...")
     print("================================================================================")
     print("🔍 FETCHING USER GROUPS FROM MICROSOFT GRAPH API")
     print("================================================================================")
 
-    if not user_assertion:
-        print("❌ ERROR: No user_assertion provided")
+    if not user_access_token:
+        print("❌ ERROR: No user_access_token provided")
         print("================================================================================")
         return []
 
-    print(f"✅ User assertion present (length: {len(user_assertion)} chars)")
+    print(f"✅ User access token present (length: {len(user_access_token)} chars)")
 
     # ------------------------------------------------------------------
-    # STEP 1: Exchange hub token for a Microsoft Graph token (OBO)
+    # STEP 1: Exchange hub access token for a Microsoft Graph token (OBO)
     # ------------------------------------------------------------------
-    graph_token = get_graph_access_token_on_behalf_of(user_assertion)
+    graph_token = get_graph_access_token_on_behalf_of(user_access_token)
     if not graph_token:
         print("❌ ERROR: Could not obtain Microsoft Graph access token via OBO flow")
         print("   Cannot query /me/memberOf without a valid Graph token")
@@ -326,7 +326,6 @@ class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
         username = auth_model.get('name', 'Unknown')
         print(f"👤 User: {username}")
         
-        # Prefer ID token as user assertion for OBO
         auth_state = auth_model.get('auth_state', {})
         if not auth_state:
             print("❌ WARNING: No auth_state in auth_model!")
@@ -336,21 +335,23 @@ class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
         
         print(f"📧 Email: {auth_state.get('user', {}).get('email', 'Unknown')}")
         
-        # Use ID token as primary assertion (audience = this app),
-        # fall back to access_token if ID token is not available.
-        user_assertion = auth_state.get('id_token') or auth_state.get('access_token')
-        if not user_assertion:
-            print("❌ WARNING: No id_token or access_token in auth_state!")
+        # Use access_token as user assertion for OBO.
+        # IMPORTANT: This token must have audience == this JupyterHub app
+        # (client_id or Application ID URI). We ensure this by configuring
+        # c.AzureAdOAuthenticator.resource to our app in values-helm.yaml.
+        user_access_token = auth_state.get('access_token')
+        if not user_access_token:
+            print("❌ WARNING: No access_token in auth_state!")
             print(f"   Available auth_state keys: {list(auth_state.keys())}")
-            print("   Cannot fetch groups without a user assertion token")
+            print("   Cannot fetch groups without an access_token")
             print("=" * 80)
             return auth_model
         
-        print(f"✅ User assertion token found (length: {len(user_assertion)} chars)")
+        print(f"✅ User access token found (length: {len(user_access_token)} chars)")
         
         # Fetch groups from Microsoft Graph API
-        print(f"📞 Calling fetch_user_groups_from_graph_api() with user_assertion...")
-        user_groups = await fetch_user_groups_from_graph_api(user_assertion)
+        print(f"📞 Calling fetch_user_groups_from_graph_api() with user_access_token...")
+        user_groups = await fetch_user_groups_from_graph_api(user_access_token)
         print(f"📞 fetch_user_groups_from_graph_api() returned: {user_groups}")
         
         # Add groups to auth_model

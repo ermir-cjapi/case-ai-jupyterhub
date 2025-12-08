@@ -77,6 +77,13 @@ hub:
         secretKeyRef:
           name: jupyterhub-azure-oauth
           key: client-secret
+    # Optional: explicit resource / audience for the JupyterHub app.
+    # If not set, we fall back to AZURE_CLIENT_ID in extraConfig.
+    AZURE_APP_RESOURCE:
+      valueFrom:
+        secretKeyRef:
+          name: jupyterhub-azure-oauth
+          key: app-resource
   
   extraConfig:
     # ============================================
@@ -162,6 +169,24 @@ hub:
       c.AzureAdOAuthenticator.client_id = os.environ.get('AZURE_CLIENT_ID')
       c.AzureAdOAuthenticator.client_secret = os.environ.get('AZURE_CLIENT_SECRET')
       c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
+
+      # Ensure the Azure AD access_token audience is *this* JupyterHub app.
+      # This is CRITICAL for the On-Behalf-Of (OBO) flow to Microsoft Graph:
+      # - We ask Azure AD for an access token whose aud == our app
+      # - Later we present that token as the 'assertion' to get a Graph token
+      #
+      # Preferred: set AZURE_APP_RESOURCE in the Kubernetes secret to either:
+      #   - The Application (client) ID, e.g. "9144a933-...."
+      #   - Or the Application ID URI, e.g. "api://9144a933-...."
+      #
+      # If AZURE_APP_RESOURCE is not set, we fall back to AZURE_CLIENT_ID.
+      resource = os.environ.get("AZURE_APP_RESOURCE") or os.environ.get("AZURE_CLIENT_ID")
+      if resource:
+          c.AzureAdOAuthenticator.resource = resource
+          print(f"✅ AzureAdOAuthenticator.resource set to: {resource}")
+      else:
+          print("⚠️ WARNING: No AZURE_APP_RESOURCE or AZURE_CLIENT_ID found.")
+          print("   OBO flow to Microsoft Graph may fail due to audience mismatch.")
       
       # MUST enable auth_state to store access_token for Graph API
       c.Authenticator.enable_auth_state = True
@@ -169,6 +194,10 @@ hub:
       # Use our custom authenticator (defined in azure_ad_auth.py)
       c.JupyterHub.authenticator_class = AzureAdGraphAuthenticator
       c.AzureAdGraphAuthenticator.manage_groups = True
+      # We implement our own allowed_groups/admin_groups checks; disable
+      # oauthenticator's built-in auth_state_groups_key handling to avoid
+      # noisy log errors when 'user.groups' is not present.
+      c.AzureAdGraphAuthenticator.auth_state_groups_key = None
       
       print(f"✅ Authenticator set to: {c.JupyterHub.authenticator_class}")
       
