@@ -197,7 +197,6 @@ hub:
       # We implement our own allowed_groups/admin_groups checks; disable
       # oauthenticator's built-in auth_state_groups_key handling to avoid
       # noisy log errors when 'user.groups' is not present.
-      c.AzureAdGraphAuthenticator.auth_state_groups_key = None
       
       print(f"✅ Authenticator set to: {c.JupyterHub.authenticator_class}")
       
