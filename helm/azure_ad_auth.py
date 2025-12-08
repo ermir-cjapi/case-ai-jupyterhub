@@ -93,24 +93,24 @@ def get_graph_token_client_credentials():
         return ""
 
 
-def fetch_user_groups(user_email: str) -> list:
+def fetch_user_groups(user_id: str) -> list:
     """
     Fetch a user's Azure AD group memberships via Microsoft Graph API.
     
     Uses Client Credentials flow (app-only token) to query groups.
     
     Args:
-        user_email: User's email address (UPN) from Azure AD
+        user_id: User's Object ID (GUID) or userPrincipalName from Azure AD
         
     Returns:
         list: List of group Object IDs (UUIDs) the user belongs to
     """
     print("================================================================================")
-    print(f"🔍 FETCHING GROUPS for user: {user_email}")
+    print(f"🔍 FETCHING GROUPS for user: {user_id}")
     print("================================================================================")
     
-    if not user_email:
-        print("❌ ERROR: No user email provided")
+    if not user_id:
+        print("❌ ERROR: No user identifier provided")
         print("================================================================================")
         return []
     
@@ -122,8 +122,9 @@ def fetch_user_groups(user_email: str) -> list:
         return []
     
     # Step 2: Query user's group memberships
-    # Use /users/{email}/memberOf to get groups for specific user
-    graph_url = f"https://graph.microsoft.com/v1.0/users/{user_email}/memberOf"
+    # Use /users/{id}/memberOf to get groups for specific user
+    # user_id can be Object ID (GUID) or userPrincipalName
+    graph_url = f"https://graph.microsoft.com/v1.0/users/{user_id}/memberOf"
     
     headers = {
         "Authorization": f"Bearer {graph_token}",
@@ -164,8 +165,8 @@ def fetch_user_groups(user_email: str) -> list:
             return group_ids
             
         elif response.status_code == 404:
-            print(f"❌ USER NOT FOUND: {user_email}")
-            print("   Check if the email matches the Azure AD UPN")
+            print(f"❌ USER NOT FOUND: {user_id}")
+            print("   The user identifier (Object ID or email) was not found in Azure AD")
             print(f"📄 Response: {response.text[:500]}")
             print("================================================================================")
             return []
@@ -274,34 +275,47 @@ class AzureAdGraphAuthenticator(AzureAdOAuthenticator):
         username = auth_model.get('name', 'Unknown')
         print(f"👤 User: {username}")
         
-        # Get user's email from auth_state
+        # Get user's identifier from auth_state
         auth_state = auth_model.get('auth_state', {})
         if not auth_state:
             print("❌ WARNING: No auth_state in auth_model!")
             print("=" * 80)
             return auth_model
         
-        # Try to get email from various locations in auth_state
+        # Try to get user identifier from auth_state
+        # Priority: Object ID (oid) > sub > email
+        # Object ID is required for guest/external users!
         user_info = auth_state.get('user', {})
+        
+        # Debug: show what's available
+        print(f"📋 user_info keys: {list(user_info.keys())}")
+        
+        # Get Object ID (works for all users including guests)
+        user_oid = user_info.get('oid') or user_info.get('sub')
         user_email = (
             user_info.get('email') or 
             user_info.get('preferred_username') or
-            user_info.get('upn') or
-            auth_state.get('email')
+            user_info.get('upn')
         )
         
+        print(f"🆔 User Object ID (oid): {user_oid}")
         print(f"📧 User email: {user_email}")
         
-        if not user_email:
-            print("❌ WARNING: Could not determine user email!")
+        # Prefer Object ID (required for guest users)
+        user_identifier = user_oid or user_email
+        
+        if not user_identifier:
+            print("❌ WARNING: Could not determine user identifier!")
             print(f"   auth_state keys: {list(auth_state.keys())}")
-            print(f"   user_info keys: {list(user_info.keys())}")
-            print("   Cannot fetch groups without user email")
+            print(f"   user_info: {user_info}")
+            print("   Cannot fetch groups without user identifier")
             print("=" * 80)
             return auth_model
         
+        print(f"✅ Using identifier: {user_identifier}")
+        
         # Fetch groups from Microsoft Graph API
-        user_groups = fetch_user_groups(user_email)
+        user_groups = fetch_user_groups(user_identifier)
         
         # Add groups to auth_model
         auth_model['groups'] = user_groups
