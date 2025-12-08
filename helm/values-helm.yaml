@@ -170,28 +170,7 @@ hub:
       c.AzureAdOAuthenticator.client_secret = os.environ.get('AZURE_CLIENT_SECRET')
       c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
 
-      # ============================================
-      # FIX ACCESS TOKEN AUDIENCE FOR OBO FLOW
-      # ============================================
-      # Force the access_token to have our app as the audience (not Graph API).
-      # This is required for the On-Behalf-Of (OBO) flow to work.
-      #
-      # In oauthenticator v17+, we must explicitly request an access token
-      # for our own app by adding it to the scope.
-      client_id = os.environ.get("AZURE_CLIENT_ID")
-      if client_id:
-          # Request token with our app as audience using the client_id/.default format
-          c.AzureAdOAuthenticator.scope = [
-              "openid",
-              "email",
-              "profile",
-              f"{client_id}/.default"  # This requests a token for our app
-          ]
-          print(f"✅ AzureAdOAuthenticator.scope set to include app audience: {client_id}/.default")
-      else:
-          print("⚠️ WARNING: AZURE_CLIENT_ID not found, cannot set proper scope!")
-      
-      # MUST enable auth_state to store access_token for Graph API
+      # Enable auth_state to store user info for group fetching
       c.Authenticator.enable_auth_state = True
       
       # Use our custom authenticator (defined in azure_ad_auth.py)
