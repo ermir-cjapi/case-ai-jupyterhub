@@ -170,23 +170,26 @@ hub:
       c.AzureAdOAuthenticator.client_secret = os.environ.get('AZURE_CLIENT_SECRET')
       c.AzureAdOAuthenticator.oauth_callback_url = "https://jupyterhub.ccrolabs.com/hub/oauth_callback"
 
-      # Ensure the Azure AD access_token audience is *this* JupyterHub app.
-      # This is CRITICAL for the On-Behalf-Of (OBO) flow to Microsoft Graph:
-      # - We ask Azure AD for an access token whose aud == our app
-      # - Later we present that token as the 'assertion' to get a Graph token
+      # ============================================
+      # FIX ACCESS TOKEN AUDIENCE FOR OBO FLOW
+      # ============================================
+      # Force the access_token to have our app as the audience (not Graph API).
+      # This is required for the On-Behalf-Of (OBO) flow to work.
       #
-      # Preferred: set AZURE_APP_RESOURCE in the Kubernetes secret to either:
-      #   - The Application (client) ID, e.g. "9144a933-...."
-      #   - Or the Application ID URI, e.g. "api://9144a933-...."
-      #
-      # If AZURE_APP_RESOURCE is not set, we fall back to AZURE_CLIENT_ID.
-      resource = os.environ.get("AZURE_APP_RESOURCE") or os.environ.get("AZURE_CLIENT_ID")
-      if resource:
-          c.AzureAdOAuthenticator.resource = resource
-          print(f"✅ AzureAdOAuthenticator.resource set to: {resource}")
+      # In oauthenticator v17+, we must explicitly request an access token
+      # for our own app by adding it to the scope.
+      client_id = os.environ.get("AZURE_CLIENT_ID")
+      if client_id:
+          # Request token with our app as audience using the client_id/.default format
+          c.AzureAdOAuthenticator.scope = [
+              "openid",
+              "email",
+              "profile",
+              f"{client_id}/.default"  # This requests a token for our app
+          ]
+          print(f"✅ AzureAdOAuthenticator.scope set to include app audience: {client_id}/.default")
       else:
-          print("⚠️ WARNING: No AZURE_APP_RESOURCE or AZURE_CLIENT_ID found.")
-          print("   OBO flow to Microsoft Graph may fail due to audience mismatch.")
+          print("⚠️ WARNING: AZURE_CLIENT_ID not found, cannot set proper scope!")
       
       # MUST enable auth_state to store access_token for Graph API
       c.Authenticator.enable_auth_state = True
